@@ -250,8 +250,9 @@ export default {
     }
   },
   created() {
-    this.loadApiaryList()
-    this.getList()
+    this.loadApiaryList().then(() => {
+      this.getList()
+    })
     this.getConfigKey("sys.user.initPassword").then(response => {
       this.initPassword = response.msg
     })
@@ -267,9 +268,33 @@ export default {
     /** 查询用户列表 */
     getList() {
       this.loading = true
-      listUser(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
-        this.userList = response.rows
-        this.total = response.total
+      
+      const queryData = this.addDateRange(this.queryParams, this.dateRange)
+      console.log('=== 查询用户列表 ===')
+      console.log('queryParams:', this.queryParams)
+      console.log('实际发送的查询数据:', queryData)
+      
+      listUser(queryData).then(response => {
+        console.log('后端返回的用户数量:', response.rows ? response.rows.length : 0)
+        
+        // 关键修复：前端根据选中的蜂场ID过滤数据
+        let filteredRows = response.rows || []
+        
+        // 始终过滤掉 apiaryId=0 的系统管理员账号
+        filteredRows = filteredRows.filter(user => user.apiaryId !== 0)
+        console.log('过滤掉系统管理员后的用户数量:', filteredRows.length)
+        
+        if (this.selectedApiaryId !== undefined && this.selectedApiaryId !== null) {
+          // 如果选中了具体蜂场，只保留该蜂场的用户
+          filteredRows = filteredRows.filter(user => user.apiaryId === this.selectedApiaryId)
+          console.log(`前端过滤后 - 蜂场ID ${this.selectedApiaryId} 的用户数量:`, filteredRows.length)
+        } else {
+          console.log('显示全部蜂场用户（已排除系统管理员）')
+        }
+        
+        console.log('最终显示的用户列表:', filteredRows)
+        this.userList = filteredRows
+        this.total = filteredRows.length
         this.loading = false
       })
     },
@@ -450,18 +475,27 @@ export default {
     },
     /** 加载蜂场列表 */
     loadApiaryList() {
-      listApiary({ pageNum: 1, pageSize: 1000 }).then(response => {
+      return listApiary({ pageNum: 1, pageSize: 1000 }).then(response => {
         this.apiaryList = response.rows || []
         // 默认选择第一个（全部蜂场）
         if (this.selectedApiaryId === undefined && this.apiaryListWithAll.length > 0) {
           this.selectedApiaryId = this.apiaryListWithAll[0].apiaryId
+          this.queryParams.apiaryId = this.apiaryListWithAll[0].apiaryId
         }
       })
     },
     /** 蜂场点击事件 */
     handleApiaryClick(item) {
+      console.log('=== 蜂场点击事件 ===')
+      console.log('点击的蜂场:', item)
+      console.log('蜂场ID:', item.apiaryId)
+      
       this.selectedApiaryId = item.apiaryId
       this.queryParams.apiaryId = item.apiaryId
+      
+      console.log('更新后的 selectedApiaryId:', this.selectedApiaryId)
+      console.log('更新后的 queryParams.apiaryId:', this.queryParams.apiaryId)
+      
       this.handleQuery()
     },
     /** 切换侧边栏展开/收起 */
