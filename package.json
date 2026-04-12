@@ -18,7 +18,6 @@
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
     "@amap/amap-jsapi-loader": "^1.0.1",
-    "vue-baidu-map": "^0.21.22",
     "@vueup/vue-quill": "1.2.0",
     "@vueuse/core": "14.1.0",
     "axios": "1.13.2",
