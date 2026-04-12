@@ -1,6 +1,41 @@
 <template>
   <div class="app-container tree-sidebar-manage-wrap">
-    <tree-panel title="组织机构" :tree-data="deptOptions" search-placeholder="请输入部门名称" storage-key="dept-sidebar-width" :defaultExpandAll="true" @node-click="handleNodeClick" @refresh="getDeptTree" ref="deptTreeRef" />
+    <!-- 左侧蜂场列表 -->
+    <div class="apiary-sidebar" :class="{ collapsed: sidebarCollapsed }">
+      <!-- 展开/收起按钮 -->
+      <div class="collapse-button-container">
+        <el-tooltip :content="sidebarCollapsed ? '展开' : '收起'" placement="right">
+          <i class="collapse-button"
+             :class="sidebarCollapsed ? 'el-icon-d-arrow-right' : 'el-icon-d-arrow-left'"
+             @click="toggleSidebar" />
+        </el-tooltip>
+      </div>
+
+      <div class="sidebar-header" v-show="!sidebarCollapsed">
+        <span class="sidebar-title">
+          <i class="el-icon-s-home"></i> 蜂场列表
+        </span>
+        <div class="sidebar-actions">
+          <el-tooltip content="刷新" placement="right">
+            <i class="action-icon el-icon-refresh" @click="loadApiaryList" />
+          </el-tooltip>
+        </div>
+      </div>
+
+      <div class="sidebar-content" v-show="!sidebarCollapsed">
+        <div
+          v-for="(item, index) in apiaryListWithAll"
+          :key="item.apiaryId || 'all'"
+          class="apiary-item"
+          :class="{ active: selectedApiaryId === item.apiaryId }"
+          @click="handleApiaryClick(item)"
+        >
+          <i :class="index === 0 ? 'el-icon-menu' : 'el-icon-office-building'" class="apiary-icon" />
+          <span class="apiary-name" :title="item.apiaryName">{{ item.apiaryName }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="tree-sidebar-content">
       <div class="content-inner">
         <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
@@ -90,20 +125,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="归属部门" prop="deptId">
-              <treeselect v-model="form.deptId" :options="enabledDeptOptions" :show-count="true" placeholder="请选择归属部门" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="12">
             <el-form-item label="手机号码" prop="phonenumber">
               <el-input v-model="form.phonenumber" placeholder="请输入手机号码" maxlength="11" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="邮箱" prop="email">
-              <el-input v-model="form.email" placeholder="请输入邮箱" maxlength="50" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -119,42 +142,17 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row>
-          <el-col :span="12">
-            <el-form-item label="用户性别">
-              <el-select v-model="form.sex" placeholder="请选择性别">
-                <el-option v-for="dict in dict.type.sys_user_sex" :key="dict.value" :label="dict.label" :value="dict.value"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
-                <el-radio v-for="dict in dict.type.sys_normal_disable" :key="dict.value" :label="dict.value">{{ dict.label }}</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="12">
-            <el-form-item label="岗位">
-              <el-select v-model="form.postIds" multiple placeholder="请选择岗位">
-                <el-option v-for="item in postOptions" :key="item.postId" :label="item.postName" :value="item.postId" :disabled="item.status == 1" ></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="角色">
-              <el-select v-model="form.roleIds" multiple placeholder="请选择角色">
-                <el-option v-for="item in roleOptions" :key="item.roleId" :label="item.roleName" :value="item.roleId" :disabled="item.status == 1"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row>
+        <el-row v-if="form.userId == undefined">
           <el-col :span="24">
-            <el-form-item label="备注">
-              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
+            <el-form-item label="所属蜂场" prop="apiaryId">
+              <el-select v-model="form.apiaryId" placeholder="请选择所属蜂场" style="width: 100%">
+                <el-option 
+                  v-for="item in apiaryList" 
+                  :key="item.apiaryId" 
+                  :label="item.apiaryName" 
+                  :value="item.apiaryId">
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -171,17 +169,15 @@
 </template>
 
 <script>
-import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus, deptTreeSelect } from "@/api/system/user"
-import Treeselect from "@riophae/vue-treeselect"
-import "@riophae/vue-treeselect/dist/vue-treeselect.css"
-import TreePanel from "@/components/TreePanel"
+import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus } from "@/api/system/user"
+import { listApiary } from "@/api/system/apiary"
 import ExcelImportDialog from "@/components/ExcelImportDialog"
 import UserViewDrawer from "./view"
 
 export default {
   name: "User",
   dicts: ['sys_normal_disable', 'sys_user_sex'],
-  components: { Treeselect, TreePanel, ExcelImportDialog, UserViewDrawer },
+  components: { ExcelImportDialog, UserViewDrawer },
   data() {
     return {
       // 遮罩层
@@ -200,20 +196,18 @@ export default {
       userList: null,
       // 弹出层标题
       title: "",
-      // 所有部门树选项
-      deptOptions: undefined,
-      // 过滤掉已禁用部门树选项
-      enabledDeptOptions: undefined,
+      // 蜂场列表
+      apiaryList: [],
+      // 选中的蜂场ID
+      selectedApiaryId: undefined,
+      // 侧边栏是否收起
+      sidebarCollapsed: false,
       // 是否显示弹出层
       open: false,
       // 默认密码
       initPassword: undefined,
       // 日期范围
       dateRange: [],
-      // 岗位选项
-      postOptions: [],
-      // 角色选项
-      roleOptions: [],
       // 表单参数
       form: {},
       // 查询参数
@@ -223,7 +217,7 @@ export default {
         userName: undefined,
         phonenumber: undefined,
         status: undefined,
-        deptId: undefined
+        apiaryId: undefined
       },
       // 列信息
       columns: {
@@ -249,29 +243,25 @@ export default {
           { min: 5, max: 20, message: '用户密码长度必须介于 5 和 20 之间', trigger: 'blur' },
           { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur" }
         ],
-        email: [
-          {
-            type: "email",
-            message: "请输入正确的邮箱地址",
-            trigger: ["blur", "change"]
-          }
-        ],
-        phonenumber: [
-          {
-            pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/,
-            message: "请输入正确的手机号码",
-            trigger: "blur"
-          }
+        apiaryId: [
+          { required: true, message: "所属蜂场不能为空", trigger: "change" }
         ]
       }
     }
   },
   created() {
+    this.loadApiaryList()
     this.getList()
-    this.getDeptTree()
     this.getConfigKey("sys.user.initPassword").then(response => {
       this.initPassword = response.msg
     })
+  },
+  computed: {
+    // 蜂场列表（包含"全部蜂场"选项）
+    apiaryListWithAll() {
+      const allOption = { apiaryId: undefined, apiaryName: '全部蜂场' }
+      return [allOption, ...this.apiaryList]
+    }
   },
   methods: {
     /** 查询用户列表 */
@@ -327,17 +317,11 @@ export default {
     reset() {
       this.form = {
         userId: undefined,
-        deptId: undefined,
         userName: undefined,
         nickName: undefined,
         password: undefined,
         phonenumber: undefined,
-        email: undefined,
-        sex: undefined,
-        status: "0",
-        remark: undefined,
-        postIds: [],
-        roleIds: []
+        apiaryId: undefined
       }
       this.resetForm("form")
     },
@@ -350,8 +334,11 @@ export default {
     resetQuery() {
       this.dateRange = []
       this.resetForm("queryForm")
-      this.queryParams.deptId = undefined
-      this.$refs.deptTreeRef.setCurrentKey(null)
+      // 重置为第一个选项（全部蜂场）
+      if (this.apiaryListWithAll.length > 0) {
+        this.selectedApiaryId = this.apiaryListWithAll[0].apiaryId
+        this.queryParams.apiaryId = this.apiaryListWithAll[0].apiaryId
+      }
       this.handleQuery()
     },
     // 多选框选中数据
@@ -376,13 +363,11 @@ export default {
     /** 新增按钮操作 */
     handleAdd() {
       this.reset()
-      getUser().then(response => {
-        this.postOptions = response.posts
-        this.roleOptions = response.roles
-        this.open = true
-        this.title = "添加用户"
-        this.form.password = this.initPassword
-      })
+      // 固定角色为蜂场管理员（role_id=2）
+      this.form.roleIds = [2]
+      this.open = true
+      this.title = "添加用户"
+      this.form.password = this.initPassword
     },
     /** 修改按钮操作 */
     handleUpdate(row) {
@@ -390,10 +375,6 @@ export default {
       const userId = row.userId || this.ids
       getUser(userId).then(response => {
         this.form = response.data
-        this.postOptions = response.posts
-        this.roleOptions = response.roles
-        this.$set(this.form, "postIds", response.postIds)
-        this.$set(this.form, "roleIds", response.roleIds)
         this.open = true
         this.title = "修改用户"
         this.form.password = ""
@@ -466,7 +447,209 @@ export default {
     /** 导入按钮操作 */
     handleImport() {
       this.$refs.importUserRef.open()
+    },
+    /** 加载蜂场列表 */
+    loadApiaryList() {
+      listApiary({ pageNum: 1, pageSize: 1000 }).then(response => {
+        this.apiaryList = response.rows || []
+        // 默认选择第一个（全部蜂场）
+        if (this.selectedApiaryId === undefined && this.apiaryListWithAll.length > 0) {
+          this.selectedApiaryId = this.apiaryListWithAll[0].apiaryId
+        }
+      })
+    },
+    /** 蜂场点击事件 */
+    handleApiaryClick(item) {
+      this.selectedApiaryId = item.apiaryId
+      this.queryParams.apiaryId = item.apiaryId
+      this.handleQuery()
+    },
+    /** 切换侧边栏展开/收起 */
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed
     }
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.tree-sidebar-manage-wrap {
+  display: flex;
+  height: calc(100vh - 84px);
+}
+
+// 蜂场侧边栏样式
+.apiary-sidebar {
+  flex-shrink: 0;
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #e8eaed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: width 0.25s ease;
+
+  &.collapsed {
+    width: 42px;
+  }
+
+  // 展开/收起按钮容器
+  .collapse-button-container {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 20px;
+    background: #fff;
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+
+    .apiary-sidebar.collapsed & {
+      right: 0;
+      background: #f7f8fa;
+      border-radius: 0 4px 4px 0;
+    }
+  }
+
+  .collapse-button {
+    font-size: 14px;
+    color: #909399;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+
+    &:hover {
+      color: #409eff;
+      background: #ecf5ff;
+    }
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    height: 40px;
+    border-bottom: 1px solid #e8eaed;
+    background: #f7f8fa;
+    flex-shrink: 0;
+
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #303133;
+      white-space: nowrap;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+
+      i {
+        color: #409eff;
+        font-size: 14px;
+      }
+    }
+
+    .sidebar-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+  }
+
+  .action-icon {
+    font-size: 14px;
+    color: #909399;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+
+    &:hover {
+      color: #409eff;
+      background: #ecf5ff;
+    }
+  }
+
+  .sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #dcdfe6;
+      border-radius: 4px;
+
+      &:hover {
+        background: #c0c4cc;
+      }
+    }
+
+    .apiary-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 2px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+
+      &:hover {
+        background: #f0f7ff;
+      }
+
+      &.active {
+        background: #e6f0fd;
+        color: #409eff;
+        font-weight: 600;
+
+        .apiary-icon {
+          color: #409eff !important;
+        }
+      }
+
+      .apiary-icon {
+        font-size: 14px;
+        color: #f5a623;
+        flex-shrink: 0;
+      }
+
+      .apiary-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+    }
+  }
+}
+
+.tree-sidebar-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.content-inner {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+</style>
