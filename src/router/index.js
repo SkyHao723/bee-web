@@ -75,6 +75,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/bee',
+    component: Layout,
+    children: [
+      {
+        path: 'info',
+        component: () => import('@/views/bee/index'),
+        name: 'BeeFarmInfo',
+        meta: { title: '蜂场信息', icon: 'dashboard' }
+      }
+    ]
+  },
+  {
     path: '/lock',
     component: () => import('@/views/lock'),
     hidden: true,
