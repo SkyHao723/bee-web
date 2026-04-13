@@ -19,6 +19,7 @@
 import AMapLoader from '@amap/amap-jsapi-loader'
 import * as echarts from 'echarts'
 import { listTemperature } from '@/api/system/temperature'
+import { listBeehive } from '@/api/system/beehive'
 
 export default {
   name: 'BeeFarmInfo',
@@ -31,10 +32,8 @@ export default {
       center: [116.403694, 39.914492],
       zoom: 17,
       locationStatus: '正在定位，请稍后...', // 状态提示
-      // 蜂场标记点数据
-      markers: [
-        { position: [118.359049,40.176274], label: '唐山市迁西县唐国权蜜蜂养殖场' },
-      ],
+      // 蜂场标记点数据（改为空数组，从后端获取）
+      markers: [],
       // ECharts实例
       chartInstance: null,
       // 查询参数
@@ -51,6 +50,7 @@ export default {
       this.initMap()
       this.initChart()
       this.loadChartData()
+      this.loadBeehiveMarkers()
     })
     window.addEventListener('resize', this.handleResize)
   },
@@ -82,13 +82,79 @@ export default {
           viewMode: '2D',
         })
 
-        // 先添加蜂场标记点
-        this.addMarkers(AMap)
+        // 注意：移除这里的 addMarkers 调用，改为在 loadBeehiveMarkers 中调用
         // 使用浏览器原生定位前先弹窗询问用户授权
         this.locateUser(AMap)
       } catch (error) {
         console.error('高德地图加载失败：', error)
         this.locationStatus = '地图加载失败，请检查网络和Key'
+      }
+    },
+    // 新增：从后端加载蜂箱标记数据
+    async loadBeehiveMarkers() {
+      try {
+        // 调用后端接口获取蜂箱列表
+        const response = await listBeehive({
+          pageNum: 1,
+          pageSize: 1000  // 获取所有蜂箱
+        })
+        
+        const beehiveList = response.rows || []
+        
+        // 转换数据格式为地图标记所需格式
+        this.markers = beehiveList.map(item => {
+          // 处理location字段，可能是 "POINT(经度 纬度)" 格式
+          let lng = 0
+          let lat = 0
+          
+          if (item.location) {
+            if (typeof item.location === 'string' && item.location.startsWith('POINT(')) {
+              // 解析 "POINT(118.180149 39.63068)" 格式
+              const coords = item.location.replace('POINT(', '').replace(')', '').split(' ')
+              lng = parseFloat(coords[0])
+              lat = parseFloat(coords[1])
+            } else if (typeof item.location === 'string') {
+              // 直接是 "经度 纬度" 格式
+              const coords = item.location.split(' ')
+              lng = parseFloat(coords[0])
+              lat = parseFloat(coords[1])
+            }
+          }
+          
+          return {
+            position: [lng, lat],
+            label: item.beehiveName || `蜂箱${item.beehiveId}`,
+            beehiveId: item.beehiveId,
+            apiaryId: item.apiaryId,
+            beehiveStatus: item.beehiveStatus
+          }
+        }).filter(item => item.position[0] !== 0 && item.position[1] !== 0)  // 过滤掉无效坐标
+        
+        // 如果有蜂箱数据，重新添加标记到地图
+        if (this.map && this.markers.length > 0) {
+          // 清除旧标记（如果有）
+          this.map.clearMap()
+          // 重新添加蜂场标记（如果需要保留的话）
+          // this.addApiaryMarkers()
+          // 添加蜂箱标记
+          // 尝试从全局或 loader 获取 AMap 对象，因为这里不在 initMap 作用域内
+          const AMap = window.AMap
+          if (AMap) {
+             this.addMarkers(AMap)
+          }
+          
+          // 可选：将地图中心设置为第一个蜂箱的位置
+          if (this.markers.length > 0) {
+            this.map.setCenter(this.markers[0].position)
+            this.map.setZoom(17)
+          }
+        }
+        
+        console.log(`成功加载 ${this.markers.length} 个蜂箱标记`)
+      } catch (error) {
+        console.error('加载蜂箱标记数据失败：', error)
+        // 如果项目中有 Element UI 的消息提示，可以启用下面这行
+        // this.$message?.error('加载蜂箱数据失败')
       }
     },
     // 2. 用户定位核心逻辑
@@ -138,6 +204,11 @@ export default {
   }
 },
     addMarkers(AMap) {
+      if (!AMap) {
+        console.error('AMap未定义，无法添加标记')
+        return
+      }
+      
       this.markers.forEach(markerData => {
         // 只添加简化的圆点标记，移除文字标签以减少视觉干扰
         const pointMarker = new AMap.Marker({
@@ -149,13 +220,22 @@ export default {
             imageOffset: new AMap.Pixel(0, 0)
           }),
           // 添加点击事件显示详细信息
-          extData: markerData.label
+          extData: markerData
         })
         
         // 点击标记时显示信息窗口
         pointMarker.on('click', () => {
+          const content = `
+            <div style="padding: 8px; font-size: 14px; min-width: 200px;">
+              <div style="font-weight: bold; margin-bottom: 8px;">${markerData.label}</div>
+              <div>蜂箱ID: ${markerData.beehiveId}</div>
+              <div>蜂场ID: ${markerData.apiaryId}</div>
+              <div>状态: ${markerData.beehiveStatus || '未知'}</div>
+              <div>坐标: [${markerData.position[0]}, ${markerData.position[1]}]</div>
+            </div>
+          `
           const infoWindow = new AMap.InfoWindow({
-            content: `<div style="padding: 8px; font-size: 14px;">${markerData.label}</div>`,
+            content: content,
             offset: new AMap.Pixel(0, -30)
           })
           infoWindow.open(this.map, markerData.position)
