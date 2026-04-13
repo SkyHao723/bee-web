@@ -109,27 +109,30 @@ $bg-glass: rgba(255, 255, 255, 0.85);
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%; // 占满父容器宽度
-      height: 24px; // 固定高度
-      margin-bottom: 2px;
+      width: 100%;
+      height: 26px; // 稍微增加高度
+      margin-bottom: 4px; // 👈 从 13px 改为 4px，图标下移，减小与文字间距
       transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
-      :deep(.nav-icon) {
-        font-size: 22px !important; // 强制图标大小
-        width: auto !important;
-        height: auto !important;
+      :deep(.el-icon) {
+        font-size: 22px !important;
+        line-height: 1 !important; // 👈 关键：消除图标行高
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transform: translateX(6px); // 👈 向右微调 3px
+      }
+
+      .nav-icon {
         color: $text-gray;
         transition: color 0.3s;
-        display: flex; // 确保图标本身也是 flex
-        align-items: center;
-        justify-content: center;
       }
 
       .active-dot {
         position: absolute;
-        bottom: -6px; // 调整位置，使其更靠近图标
-        left: 50%; // 水平居中
-        transform: translateX(-50%) scale(0); // 水平居中 + 初始缩放
+        bottom: -3px; // 👈 进一步下移到 -10px，远离文字
+        left: 50%;
+        transform: translateX(-50%) scale(0);
         width: 4px;
         height: 4px;
         background: $primary-color;
