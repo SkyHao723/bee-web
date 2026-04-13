@@ -65,8 +65,9 @@ const navigate = (path) => {
 <style lang="scss" scoped>
 // 定义主题色变量
 $primary-color: #007AFF; // 更现代的 iOS 风格蓝色
-$text-gray: #94a3b8;
-$bg-glass: rgba(255, 255, 255, 0.85);
+$text-gray: #64748b; // 👈 加深灰色，提高对比度
+$text-dark: #1e293b; // 👈 深色文字，确保在透明背景下清晰可见
+$bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
 
 .footer-nav-container {
   position: fixed;
@@ -87,8 +88,8 @@ $bg-glass: rgba(255, 255, 255, 0.85);
   max-width: 500px; // 限制大屏下的宽度
   height: 64px;
   background: $bg-glass;
-  backdrop-filter: blur(10px); // 毛玻璃核心
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(20px); // 👈 从 15px 增加到 20px，增强毛玻璃效果以补偿透明度
+  border: 1px solid rgba(255, 255, 255, 0.15); // 👈 从 0.2 改为 0.15，边框也更透明
   border-radius: 40px; // 圆润的边角
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   overflow: hidden;
@@ -124,8 +125,9 @@ $bg-glass: rgba(255, 255, 255, 0.85);
       }
 
       .nav-icon {
-        color: $text-gray;
+        color: $text-dark; // 👈 使用深色，确保在透明背景下清晰可见
         transition: color 0.3s;
+        filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8)); // 👈 添加白色阴影增强对比
       }
 
       .active-dot {
@@ -144,10 +146,11 @@ $bg-glass: rgba(255, 255, 255, 0.85);
 
     .nav-text {
       font-size: 11px;
-      font-weight: 500;
-      color: $text-gray;
+      font-weight: 600; // 👈 从 500 增加到 600，加粗文字
+      color: $text-dark; // 👈 使用深色，确保在透明背景下清晰可见
       line-height: 1; // 确保文字行高一致，避免垂直偏移
       text-align: center; // 文字水平居中
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9); // 👈 添加白色阴影增强可读性
       transition: all 0.3s;
     }
 
