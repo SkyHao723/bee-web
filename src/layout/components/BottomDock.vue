@@ -10,9 +10,7 @@
         @click="navigate(item.path)"
       >
         <div class="icon-wrapper">
-          <el-icon class="nav-icon">
-            <component :is="getIconComponent(item.icon)" />
-          </el-icon>
+          <svg-icon :icon-class="item.icon" class="nav-icon" />
           <div class="active-dot"></div>
         </div>
         <span class="nav-text">{{ item.title }}</span>
@@ -24,32 +22,65 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { computed } from 'vue'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import SvgIcon from '@/components/SvgIcon'
 import useAppStore from '@/store/modules/app'
+import usePermissionStore from '@/store/modules/permission'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
+const permissionStore = usePermissionStore()
 
 // 获取设备类型
 const device = computed(() => appStore.device)
 
-// 菜单数据 - 从路由配置中动态获取有权限的菜单
+// 菜单数据 - 从 permissionStore 中动态获取侧边栏路由
 const menuList = computed(() => {
-  // 这里可以根据实际项目需求从 store 或路由配置中获取
-  // 示例：写死几个常用菜单
-  return [
-    { path: '/index', title: '首页', icon: 'HomeFilled' },
-    { path: '/beehive', title: '蜂箱', icon: 'Box' },
-    { path: '/system/user', title: '用户', icon: 'User' },
-    { path: '/bigdisplay', title: '大屏', icon: 'Monitor' }
-  ]
+  const routes = permissionStore.sidebarRouters || []
+  const menus = []
+  
+  // 递归提取所有可见的叶子节点路由（最终可点击的菜单项）
+  const extractVisibleRoutes = (routeList, parentPath = '') => {
+    routeList.forEach(route => {
+      // 跳过隐藏的菜单
+      if (route.hidden) return
+      
+      // 如果有子路由
+      if (route.children && route.children.length > 0) {
+        // 如果只有一个子路由且不是 alwaysShow，直接使用子路由
+        const visibleChildren = route.children.filter(child => !child.hidden)
+        
+        if (visibleChildren.length === 1 && !route.alwaysShow) {
+          const child = visibleChildren[0]
+          const fullPath = parentPath ? `${parentPath}/${child.path}` : (child.path.startsWith('/') ? child.path : `/${child.path}`)
+          menus.push({
+            path: fullPath,
+            title: child.meta?.title || route.meta?.title || '未命名',
+            icon: child.meta?.icon || route.meta?.icon || 'Menu'
+          })
+        } else {
+          // 多个子路由或 alwaysShow，递归处理子路由
+          const currentPath = parentPath ? `${parentPath}/${route.path}` : (route.path.startsWith('/') ? route.path : `/${route.path}`)
+          extractVisibleRoutes(visibleChildren, currentPath)
+        }
+      } 
+      // 没有子路由，直接添加
+      else {
+        const fullPath = parentPath ? `${parentPath}/${route.path}` : (route.path.startsWith('/') ? route.path : `/${route.path}`)
+        menus.push({
+          path: fullPath,
+          title: route.meta?.title || '未命名',
+          icon: route.meta?.icon || 'Menu'
+        })
+      }
+    })
+  }
+  
+  extractVisibleRoutes(routes)
+  
+  // 限制最多显示5个菜单项，避免移动端拥挤
+  return menus.slice(0, 5)
 })
-
-// 获取图标组件
-const getIconComponent = (iconName) => {
-  return ElementPlusIconsVue[iconName] || ElementPlusIconsVue['Menu']
-}
 
 // 判断是否激活
 const isActive = (path) => {
@@ -115,13 +146,16 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
       margin-bottom: 4px; // 👈 从 13px 改为 4px，图标下移，减小与文字间距
       transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
-      :deep(.el-icon) {
+      :deep(.svg-icon) {
         font-size: 22px !important;
-        line-height: 1 !important; // 👈 关键：消除图标行高
+        width: 22px !important;
+        height: 22px !important;
+        line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transform: translateX(6px); // 👈 向右微调 3px
+        margin-right: 0 !important; // 👈 移除默认右边距
+        margin-left: 5; // 👈 通过调整这个值来移动图标（正数右移，负数左移）
       }
 
       .nav-icon {
