@@ -1,24 +1,40 @@
 <template>
   <div :class="classObj" class="app-wrapper" :style="{ '--current-color': theme, '--current-color-light': theme + '1a', '--current-color-dark-bg': theme + '33' }">
-    <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg" @click="handleClickOutside"/>
-    <sidebar v-if="!sidebar.hide" class="sidebar-container" />
-    <div :class="{ hasTagsView: needTagsView, sidebarHide: sidebar.hide }" class="main-container">
-      <div :class="{ 'fixed-header': fixedHeader }">
-        <navbar @setLayout="setLayout" />
-        <tags-view v-if="needTagsView" />
+    <!-- 电脑端：显示侧边栏 + 主体内容 -->
+    <template v-if="!isMobile">
+      <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg" @click="handleClickOutside"/>
+      <sidebar v-if="!sidebar.hide" class="sidebar-container" />
+      <div :class="{ hasTagsView: needTagsView, sidebarHide: sidebar.hide }" class="main-container">
+        <div :class="{ 'fixed-header': fixedHeader }">
+          <navbar @setLayout="setLayout" />
+          <tags-view v-if="needTagsView" />
+        </div>
+        <app-main />
+        <settings ref="settingRef" />
       </div>
-      <app-main />
-      <settings ref="settingRef" />
-    </div>
+    </template>
+
+    <!-- 移动端：只显示主体内容，底部显示 Dock 栏 -->
+    <template v-else>
+      <div class="mobile-main-container">
+        <navbar v-if="showMobileNavbar" />
+        <app-main />
+      </div>
+      <bottom-dock />
+    </template>
   </div>
 </template>
 
 <script setup>
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useWindowSize } from '@vueuse/core'
+import { useDevice } from '@/composables/useDevice'
 import Sidebar from './components/Sidebar/index.vue'
-import { AppMain, Navbar, Settings, TagsView } from './components'
+import { AppMain, Navbar, Settings, TagsView, BottomDock } from './components'
 import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
+
+const { isMobile } = useDevice()
 
 const settingsStore = useSettingsStore()
 const theme = computed(() => settingsStore.theme)
@@ -27,6 +43,13 @@ const device = computed(() => useAppStore().device)
 const needTagsView = computed(() => settingsStore.tagsView)
 const fixedHeader = computed(() => settingsStore.fixedHeader)
 
+// 可选：移动端是否显示顶部导航栏
+const showMobileNavbar = computed(() => {
+  // 可根据路由或配置决定是否显示，默认 false 以节省空间
+  return false
+})
+
+// 动态绑定 class（保留原有样式逻辑）
 const classObj = computed(() => ({
   hideSidebar: !sidebar.value.opened,
   openSidebar: sidebar.value.opened,
@@ -81,6 +104,19 @@ function setLayout() {
 .main-container:has(.fixed-header) {
   height: 100vh;
   overflow: hidden;
+}
+
+// 移动端时为底部Dock留出空间
+.mobile .main-container {
+  padding-bottom: 60px;
+}
+
+// 移动端主容器样式
+.mobile-main-container {
+  height: 100%;
+  padding-bottom: 60px; /* 为底部 Dock 栏留出空间，避免遮挡内容 */
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .drawer-bg {

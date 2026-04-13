@@ -47,10 +47,9 @@ export default {
   },
   mounted() {
     this.$nextTick(() => {
-      this.initMap()
+      this.initMapAndLoadMarkers()
       this.initChart()
       this.loadChartData()
-      this.loadBeehiveMarkers()
     })
     window.addEventListener('resize', this.handleResize)
   },
@@ -66,6 +65,11 @@ export default {
     window.removeEventListener('resize', this.handleResize)
   },
   methods: {
+    // 新增：初始化地图并加载蜂箱标记（确保顺序执行）
+    async initMapAndLoadMarkers() {
+      await this.initMap()  // 等待地图初始化完成
+      await this.loadBeehiveMarkers()  // 地图就绪后再加载标记
+    },
     async initMap() {
       try {
         const AMap = await AMapLoader.load({
@@ -93,6 +97,21 @@ export default {
     // 新增：从后端加载蜂箱标记数据
     async loadBeehiveMarkers() {
       try {
+        // 确保地图已初始化
+        if (!this.map) {
+          console.warn('地图未初始化，等待地图就绪...')
+          // 等待地图初始化（最多等待5秒）
+          let waitCount = 0
+          while (!this.map && waitCount < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+            waitCount++
+          }
+          if (!this.map) {
+            console.error('地图初始化超时')
+            return
+          }
+        }
+
         // 调用后端接口获取蜂箱列表
         const response = await listBeehive({
           pageNum: 1,
@@ -130,17 +149,18 @@ export default {
           }
         }).filter(item => item.position[0] !== 0 && item.position[1] !== 0)  // 过滤掉无效坐标
         
-        // 如果有蜂箱数据，重新添加标记到地图
-        if (this.map && this.markers.length > 0) {
+        // 如果有蜂箱数据，添加到地图
+        if (this.markers.length > 0) {
           // 清除旧标记（如果有）
           this.map.clearMap()
-          // 重新添加蜂场标记（如果需要保留的话）
-          // this.addApiaryMarkers()
+          
           // 添加蜂箱标记
-          // 尝试从全局或 loader 获取 AMap 对象，因为这里不在 initMap 作用域内
           const AMap = window.AMap
           if (AMap) {
              this.addMarkers(AMap)
+          } else {
+            console.error('AMap 对象未找到，无法添加标记')
+            return
           }
           
           // 可选：将地图中心设置为第一个蜂箱的位置
