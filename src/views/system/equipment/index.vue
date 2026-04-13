@@ -17,22 +17,6 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="蜂箱名称" prop="beehiveName">
-        <el-input
-          v-model="queryParams.beehiveName"
-          placeholder="请输入蜂箱名称"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="蜂箱组" prop="beehiveGroup">
-        <el-input
-          v-model="queryParams.beehiveGroup"
-          placeholder="请输入蜂箱组"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -46,7 +30,7 @@
           plain
           icon="Plus"
           @click="handleAdd"
-          v-hasPermi="['system:beehive:add']"
+          v-hasPermi="['system:equipment:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -56,7 +40,7 @@
           icon="Edit"
           :disabled="single"
           @click="handleUpdate"
-          v-hasPermi="['system:beehive:edit']"
+          v-hasPermi="['system:equipment:edit']"
         >修改</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -66,7 +50,7 @@
           icon="Delete"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['system:beehive:remove']"
+          v-hasPermi="['system:equipment:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -75,24 +59,22 @@
           plain
           icon="Download"
           @click="handleExport"
-          v-hasPermi="['system:beehive:export']"
+          v-hasPermi="['system:equipment:export']"
         >导出</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="beehiveList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="equipmentList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
+      <el-table-column label="设备编号" align="center" prop="equipmentId" />
       <el-table-column label="蜂箱ID" align="center" prop="beehiveId" />
       <el-table-column label="蜂厂ID" align="center" prop="apiaryId" />
-      <el-table-column label="蜂箱名称" align="center" prop="beehiveName" />
-      <el-table-column label="蜂箱状态" align="center" prop="beehiveStatus" />
-      <el-table-column label="蜂箱组" align="center" prop="beehiveGroup" />
-      <el-table-column label="位置" align="center" prop="location" />
+      <el-table-column label="设备状态" align="center" prop="deviceStatus" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:beehive:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:beehive:remove']">删除</el-button>
+          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:equipment:edit']">修改</el-button>
+          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:equipment:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -105,9 +87,9 @@
       @pagination="getList"
     />
 
-    <!-- 添加或修改蜂箱管理对话框 -->
+    <!-- 添加或修改设备管理对话框 -->
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="beehiveRef" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="equipmentRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
             <el-form-item label="蜂箱ID" prop="beehiveId">
@@ -117,16 +99,6 @@
           <el-col :span="24">
             <el-form-item label="蜂厂ID" prop="apiaryId">
               <el-input v-model="form.apiaryId" placeholder="请输入蜂厂ID" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="蜂箱名称" prop="beehiveName">
-              <el-input v-model="form.beehiveName" placeholder="请输入蜂箱名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="蜂箱组" prop="beehiveGroup">
-              <el-input v-model="form.beehiveGroup" placeholder="请输入蜂箱组" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -141,12 +113,12 @@
   </div>
 </template>
 
-<script setup name="Beehive">
-import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive } from "@/api/system/beehive"
+<script setup name="Equipment">
+import { listEquipment, getEquipment, delEquipment, addEquipment, updateEquipment } from "@/api/system/equipment"
 
 const { proxy } = getCurrentInstance()
 
-const beehiveList = ref([])
+const equipmentList = ref([])
 const open = ref(false)
 const loading = ref(true)
 const showSearch = ref(true)
@@ -163,10 +135,7 @@ const data = reactive({
     pageSize: 10,
     beehiveId: null,
     apiaryId: null,
-    beehiveName: null,
-    beehiveStatus: null,
-    beehiveGroup: null,
-    location: null
+    deviceStatus: null
   },
   rules: {
     beehiveId: [
@@ -175,35 +144,19 @@ const data = reactive({
     apiaryId: [
       { required: true, message: "蜂厂ID不能为空", trigger: "blur" }
     ],
-    beehiveName: [
-      { required: true, message: "蜂箱名称不能为空", trigger: "blur" }
-    ],
-    beehiveStatus: [
-      { required: true, message: "蜂箱状态不能为空", trigger: "change" }
-    ],
-    beehiveGroup: [
-      { required: true, message: "蜂箱组不能为空", trigger: "blur" }
-    ],
-    location: [
-      { required: true, message: "位置不能为空", trigger: "blur" }
+    deviceStatus: [
+      { required: true, message: "设备状态不能为空", trigger: "change" }
     ]
   }
 })
 
 const { queryParams, form, rules } = toRefs(data)
 
-/** 查询蜂箱管理列表 */
+/** 查询设备管理列表 */
 function getList() {
   loading.value = true
-  listBeehive(queryParams.value).then(response => {
-    // 处理位置字段,去掉 "POINT()" 格式
-    beehiveList.value = response.rows.map(item => {
-      if (item.location && typeof item.location === 'string' && item.location.startsWith('POINT(')) {
-        // 提取括号内的坐标值: "POINT(118.180149 39.63068)" -> "118.180149 39.63068"
-        item.location = item.location.replace('POINT(', '').replace(')', '')
-      }
-      return item
-    })
+  listEquipment(queryParams.value).then(response => {
+    equipmentList.value = response.rows
     total.value = response.total
     loading.value = false
   })
@@ -218,14 +171,12 @@ function cancel() {
 // 表单重置
 function reset() {
   form.value = {
+    equipmentId: null,
     beehiveId: null,
     apiaryId: null,
-    beehiveName: null,
-    beehiveStatus: null,
-    beehiveGroup: null,
-    location: null
+    deviceStatus: null
   }
-  proxy.resetForm("beehiveRef")
+  proxy.resetForm("equipmentRef")
 }
 
 /** 搜索按钮操作 */
@@ -242,7 +193,7 @@ function resetQuery() {
 
 // 多选框选中数据
 function handleSelectionChange(selection) {
-  ids.value = selection.map(item => item.beehiveId)
+  ids.value = selection.map(item => item.equipmentId)
   single.value = selection.length != 1
   multiple.value = !selection.length
 }
@@ -251,32 +202,32 @@ function handleSelectionChange(selection) {
 function handleAdd() {
   reset()
   open.value = true
-  title.value = "添加蜂箱管理"
+  title.value = "添加设备管理"
 }
 
 /** 修改按钮操作 */
 function handleUpdate(row) {
   reset()
-  const _beehiveId = row.beehiveId || ids.value
-  getBeehive(_beehiveId).then(response => {
+  const _equipmentId = row.equipmentId || ids.value
+  getEquipment(_equipmentId).then(response => {
     form.value = response.data
     open.value = true
-    title.value = "修改蜂箱管理"
+    title.value = "修改设备管理"
   })
 }
 
 /** 提交按钮 */
 function submitForm() {
-  proxy.$refs["beehiveRef"].validate(valid => {
+  proxy.$refs["equipmentRef"].validate(valid => {
     if (valid) {
-      if (form.value.beehiveId != null) {
-        updateBeehive(form.value).then(() => {
+      if (form.value.equipmentId != null) {
+        updateEquipment(form.value).then(() => {
           proxy.$modal.msgSuccess("修改成功")
           open.value = false
           getList()
         })
       } else {
-        addBeehive(form.value).then(() => {
+        addEquipment(form.value).then(() => {
           proxy.$modal.msgSuccess("新增成功")
           open.value = false
           getList()
@@ -288,9 +239,9 @@ function submitForm() {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
-  const _beehiveIds = row.beehiveId || ids.value
-  proxy.$modal.confirm('是否确认删除蜂箱管理编号为"' + _beehiveIds + '"的数据项？').then(function() {
-    return delBeehive(_beehiveIds)
+  const _equipmentIds = row.equipmentId || ids.value
+  proxy.$modal.confirm('是否确认删除设备管理编号为"' + _equipmentIds + '"的数据项？').then(function() {
+    return delEquipment(_equipmentIds)
   }).then(() => {
     getList()
     proxy.$modal.msgSuccess("删除成功")
@@ -299,9 +250,9 @@ function handleDelete(row) {
 
 /** 导出按钮操作 */
 function handleExport() {
-  proxy.download('system/beehive/export', {
+  proxy.download('system/equipment/export', {
     ...queryParams.value
-  }, `beehive_${new Date().getTime()}.xlsx`)
+  }, `equipment_${new Date().getTime()}.xlsx`)
 }
 
 getList()

@@ -31,6 +31,36 @@ service.interceptors.request.use(config => {
   if (getToken() && !isToken) {
     config.headers['Authorization'] = 'Bearer ' + getToken() // 让每个请求携带自定义token 请根据实际情况自行修改
   }
+  
+  // 自动添加 apiaryId 参数到特定接口
+  const userStore = useUserStore()
+  if (userStore.apiaryId) {
+    const needApiaryIdUrls = [
+      '/system/beehive/list',
+      '/system/equipment/list',
+      '/beekeeper/beekeeper/list'
+    ]
+    
+    // 检查当前请求URL是否需要添加 apiaryId
+    const shouldAddApiaryId = needApiaryIdUrls.some(url => config.url.includes(url))
+    
+    if (shouldAddApiaryId) {
+      if (config.method === 'get') {
+        // GET 请求，添加到 params
+        config.params = {
+          ...config.params,
+          apiaryId: userStore.apiaryId
+        }
+      } else if (config.method === 'post' || config.method === 'put') {
+        // POST/PUT 请求，添加到 data
+        config.data = {
+          ...config.data,
+          apiaryId: userStore.apiaryId
+        }
+      }
+    }
+  }
+  
   // get请求映射params参数
   if (config.method === 'get' && config.params) {
     let url = config.url + '?' + tansParams(config.params)

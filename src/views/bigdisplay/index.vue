@@ -6,12 +6,19 @@
     </div>
 
     <div id="amap-container" class="map-container"></div>
+    
+    <!-- 温湿度统计图 -->
+    <div class="chart-container">
+      <div ref="chartRef" class="chart"></div>
+    </div>
   </div>
 </template>
 
 <script lang="js">
 // @ts-nocheck
 import AMapLoader from '@amap/amap-jsapi-loader'
+import * as echarts from 'echarts'
+import { listTemperature } from '@/api/system/temperature'
 
 export default {
   name: 'BeeFarmInfo',
@@ -27,12 +34,23 @@ export default {
       // 蜂场标记点数据
       markers: [
         { position: [118.359049,40.176274], label: '唐山市迁西县唐国权蜜蜂养殖场' },
-      ]
+      ],
+      // ECharts实例
+      chartInstance: null,
+      // 查询参数
+      queryParams: {
+        apiaryId: 1,
+        beehiveId: 1,
+        pageNum: 1,
+        pageSize: 10
+      }
     }
   },
   mounted() {
     this.$nextTick(() => {
       this.initMap()
+      this.initChart()
+      this.loadChartData()
     })
     window.addEventListener('resize', this.handleResize)
   },
@@ -40,6 +58,10 @@ export default {
     if (this.map) {
       this.map.destroy()
       this.map = null
+    }
+    if (this.chartInstance) {
+      this.chartInstance.dispose()
+      this.chartInstance = null
     }
     window.removeEventListener('resize', this.handleResize)
   },
@@ -146,6 +168,122 @@ export default {
       if (this.map) {
         this.map.resize()
       }
+      if (this.chartInstance) {
+        this.chartInstance.resize()
+      }
+    },
+    // 初始化ECharts图表
+    initChart() {
+      this.chartInstance = echarts.init(this.$refs.chartRef)
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'cross',
+            crossStyle: {
+              color: '#999'
+            }
+          }
+        },
+        toolbox: {
+          feature: {
+            dataView: { show: true, readOnly: false },
+            magicType: { show: true, type: ['line', 'bar'] },
+            restore: { show: true },
+            saveAsImage: { show: true }
+          }
+        },
+        legend: {
+          data: ['湿度', '温度']
+        },
+        xAxis: [
+          {
+            type: 'category',
+            data: [],
+            axisPointer: {
+              type: 'shadow'
+            }
+          }
+        ],
+        yAxis: [
+          {
+            type: 'value',
+            name: '湿度',
+            min: 0,
+            max: 100,
+            interval: 20,
+            axisLabel: {
+              formatter: '{value} %'
+            }
+          },
+          {
+            type: 'value',
+            name: '温度',
+            min: 0,
+            max: 50,
+            interval: 10,
+            axisLabel: {
+              formatter: '{value} °C'
+            }
+          }
+        ],
+        series: [
+          {
+            name: '湿度',
+            type: 'line',
+            yAxisIndex: 0,
+            tooltip: {
+              valueFormatter: function (value) {
+                return value + ' %';
+              }
+            },
+            data: []
+          },
+          {
+            name: '温度',
+            type: 'bar',
+            yAxisIndex: 1,
+            tooltip: {
+              valueFormatter: function (value) {
+                return value + ' °C';
+              }
+            },
+            data: []
+          }
+        ]
+      }
+      this.chartInstance.setOption(option)
+    },
+    // 加载图表数据
+    async loadChartData() {
+      try {
+        const response = await listTemperature(this.queryParams)
+        const data = response.rows || []
+        
+        // 提取时间和数据
+        const times = data.map(item => item.createTime || item.time)
+        const humidity = data.map(item => parseFloat(item.humidity) || 0)
+        const temperature = data.map(item => parseFloat(item.temperature) || 0)
+        
+        // 更新图表
+        this.chartInstance.setOption({
+          xAxis: [
+            {
+              data: times
+            }
+          ],
+          series: [
+            {
+              data: humidity
+            },
+            {
+              data: temperature
+            }
+          ]
+        })
+      } catch (error) {
+        console.error('加载图表数据失败：', error)
+      }
     }
   }
 }
@@ -175,5 +313,16 @@ export default {
   flex: 1;
   width: 100%;
   min-height: 0;
+}
+.chart-container {
+  flex-shrink: 0;
+  height: 400px;
+  padding: 20px;
+  background-color: #fff;
+  border-top: 1px solid #e6e6e6;
+}
+.chart {
+  width: 100%;
+  height: 100%;
 }
 </style>
