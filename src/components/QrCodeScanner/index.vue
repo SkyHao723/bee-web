@@ -1,312 +1,202 @@
 <template>
-  <div class="qr-code-scanner">
-    <el-button
-      type="primary"
-      plain
-      icon="Camera"
-      @click="openScanner"
-    >扫码绑定</el-button>
-    
-    <el-button
-      type="success"
-      plain
-      icon="Picture"
-      @click="openImageScanner"
-      style="margin-left: 10px;"
-    >图片识别</el-button>
+  <div class="qrcode-scanner">
+    <el-button type="primary" :icon="Camera" @click="openScanner">扫描二维码</el-button>
 
-    <!-- 摄像头扫描对话框 -->
     <el-dialog
-      v-model="scannerVisible"
+      v-model="dialogVisible"
       title="扫描二维码"
       width="500px"
       :close-on-click-modal="false"
-      @close="stopScanner"
+      @close="handleClose"
     >
-      <div id="qr-reader" class="scanner-container"></div>
-      <div class="scanner-tips">
-        <p>请将二维码对准摄像头</p>
+      <div class="scanner-container">
+        <div id="qr-reader" class="qr-reader"></div>
+        <div v-if="scanError" class="scan-error">{{ scanError }}</div>
       </div>
       <template #footer>
-        <el-button @click="closeScanner">取消</el-button>
+        <el-button @click="handleClose">取消</el-button>
       </template>
     </el-dialog>
-    
-    <!-- 图片识别对话框 -->
+
+    <!-- 扫描结果展示 -->
     <el-dialog
-      v-model="imageScannerVisible"
-      title="图片识别二维码"
-      width="500px"
-      :close-on-click-modal="false"
+      v-model="resultDialogVisible"
+      title="扫描结果"
+      width="400px"
     >
-      <div class="image-upload-container">
-        <el-upload
-          ref="uploadRef"
-          class="upload-demo"
-          drag
-          action=""
-          :auto-upload="false"
-          :on-change="handleImageChange"
-          :show-file-list="false"
-          accept="image/*"
-        >
-          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-          <div class="el-upload__text">
-            拖拽图片到此处或 <em>点击上传</em>
-          </div>
-          <template #tip>
-            <div class="el-upload__tip">
-              支持 jpg/png/gif 格式,文件大小不超过 5MB
-            </div>
-          </template>
-        </el-upload>
-        
-        <div v-if="previewImage" class="image-preview">
-          <img :src="previewImage" alt="预览图" />
-        </div>
-      </div>
-      
-      <div v-if="scanResult" class="scan-result">
-        <el-alert
-          :title="'识别结果: ' + scanResult"
-          type="success"
-          :closable="false"
-          show-icon
-        />
-      </div>
-      
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="二维码数据">{{ scanResult }}</el-descriptions-item>
+      </el-descriptions>
       <template #footer>
-        <el-button @click="closeImageScanner">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="confirmScanResult"
-          :disabled="!scanResult"
-        >确认绑定</el-button>
+        <el-button @click="resultDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="submitToBackend">提交到后端</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick, onUnmounted } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
+import { Camera } from '@element-plus/icons-vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { ElMessage } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
 
-const emit = defineEmits(['submit-data'])
+const props = defineProps({
+  // 扫描成功后是否自动提交到后端
+  autoSubmit: {
+    type: Boolean,
+    default: true
+  }
+})
 
-const scannerVisible = ref(false)
-const imageScannerVisible = ref(false)
-const previewImage = ref('')
+const emit = defineEmits(['scan-success', 'scan-error'])
+
+const dialogVisible = ref(false)
+const resultDialogVisible = ref(false)
 const scanResult = ref('')
+const scanError = ref('')
+
 let html5QrCode = null
+let isScanning = ref(false)
 
-/**
- * 打开摄像头扫描器
- */
-function openScanner() {
-  scannerVisible.value = true
-  nextTick(() => {
-    startScanner()
-  })
+// 打开扫描器
+const openScanner = () => {
+  dialogVisible.value = true
+  scanError.value = ''
+  // 延迟初始化，确保DOM已渲染
+  setTimeout(() => {
+    initScanner()
+  }, 100)
 }
 
-/**
- * 打开图片识别器
- */
-function openImageScanner() {
-  imageScannerVisible.value = true
-  previewImage.value = ''
-  scanResult.value = ''
-}
-
-/**
- * 启动摄像头扫描器
- */
-function startScanner() {
-  const qrReaderElement = document.getElementById('qr-reader')
-  if (!qrReaderElement) {
-    console.error('未找到二维码扫描容器元素')
+// 初始化扫描器
+const initScanner = () => {
+  if (html5QrCode) {
     return
   }
 
-  html5QrCode = new Html5Qrcode('qr-reader')
-  
-  html5QrCode.start(
-    { facingMode: 'environment' },
-    {
+  try {
+    html5QrCode = new Html5Qrcode('qr-reader')
+
+    const config = {
       fps: 10,
-      qrbox: { width: 250, height: 250 }
-    },
-    (decodedText) => {
-      // 扫描成功
-      handleScanSuccess(decodedText)
-    },
-    (errorMessage) => {
-      // 扫描失败(正常情况,持续扫描中)
-      // console.log(errorMessage)
+      qrbox: {
+        width: 250,
+        height: 250
+      },
+      aspectRatio: 1.0
     }
-  ).catch((err) => {
-    console.error('启动扫描器失败:', err)
-    ElMessage.error('无法启动摄像头,请检查权限设置')
-    closeScanner()
-  })
+
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      config,
+      onScanSuccess,
+      onScanFailure
+    ).then(() => {
+      isScanning.value = true
+    }).catch(err => {
+      scanError.value = '无法启动摄像头: ' + err
+      console.error('启动扫描失败:', err)
+    })
+  } catch (err) {
+    scanError.value = '初始化扫描器失败: ' + err
+    console.error('初始化失败:', err)
+  }
 }
 
-/**
- * 停止摄像头扫描器
- */
-async function stopScanner() {
-  if (html5QrCode) {
+// 扫描成功回调
+const onScanSuccess = (decodedText, decodedResult) => {
+  // 停止扫描
+  stopScanner()
+
+  scanResult.value = decodedText
+  dialogVisible.value = false
+  resultDialogVisible.value = true
+
+  emit('scan-success', {
+    data: decodedText,
+    result: decodedResult
+  })
+
+  // 如果需要自动提交
+  if (props.autoSubmit) {
+    submitToBackend()
+  }
+}
+
+// 扫描失败回调
+const onScanFailure = (error) => {
+  // 扫描失败是正常的，不需要显示错误
+  // console.warn('Scan failed:', error)
+}
+
+// 停止扫描
+const stopScanner = async () => {
+  if (html5QrCode && isScanning.value) {
     try {
       await html5QrCode.stop()
-      html5QrCode.clear()
-      html5QrCode = null
+      isScanning.value = false
     } catch (err) {
-      console.error('停止扫描器失败:', err)
+      // 忽略"scanner is not running"错误，这不影响功能
+      if (!err.toString().includes('not running')) {
+        console.error('停止扫描失败:', err)
+      }
+      isScanning.value = false
     }
   }
 }
 
-/**
- * 关闭摄像头扫描器
- */
-async function closeScanner() {
-  await stopScanner()
-  scannerVisible.value = false
-}
-
-/**
- * 处理图片选择
- */
-async function handleImageChange(file) {
-  if (!file.raw) return
-  
-  // 验证文件大小 (5MB)
-  const maxSize = 5 * 1024 * 1024
-  if (file.size > maxSize) {
-    ElMessage.warning('图片大小不能超过 5MB')
-    return
-  }
-  
-  // 创建预览
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    previewImage.value = e.target.result
-    
-    // 开始识别
-    recognizeQRCode(e.target.result)
-  }
-  reader.readAsDataURL(file.raw)
-}
-
-/**
- * 识别图片中的二维码
- */
-async function recognizeQRCode(imageData) {
-  try {
-    // 使用一个唯一的 ID 或者虚拟 ID，因为 scanFileV2 不需要实际的 DOM 元素
-    const html5QrCodeInstance = new Html5Qrcode('qr-reader-image-' + Date.now())
-    const result = await html5QrCodeInstance.scanFileV2(imageData, false)
-    
-    if (result && result.decodedText) {
-      scanResult.value = result.decodedText
-      ElMessage.success('识别成功')
-    } else {
-      ElMessage.warning('未在图片中检测到二维码')
-      scanResult.value = ''
-    }
-  } catch (err) {
-    console.error('识别失败:', err)
-    ElMessage.error('识别失败,请确保图片中包含清晰的二维码')
-    scanResult.value = ''
-  }
-}
-
-/**
- * 确认扫描结果并绑定
- */
-function confirmScanResult() {
+// 提交到后端
+const submitToBackend = async () => {
   if (!scanResult.value) {
-    ElMessage.warning('请先识别有效的二维码')
+    ElMessage.warning('没有扫描数据')
     return
   }
-  
+
+  resultDialogVisible.value = false
+
   emit('submit-data', scanResult.value)
-  closeImageScanner()
-  ElMessage.success('绑定成功')
+
+  // 提示用户数据已准备好，等待父组件处理
+  ElMessage.success('二维码数据已获取，请继续操作')
 }
 
-/**
- * 关闭图片识别器
- */
-function closeImageScanner() {
-  imageScannerVisible.value = false
-  previewImage.value = ''
-  scanResult.value = ''
-}
-
-/**
- * 处理摄像头扫描成功
- */
-function handleScanSuccess(decodedText) {
+// 关闭扫描器
+const handleClose = () => {
   stopScanner()
-  scannerVisible.value = false
-  emit('submit-data', decodedText)
-  ElMessage.success('扫描成功')
+  dialogVisible.value = false
 }
 
-/**
- * 组件卸载时清理资源
- */
-onUnmounted(() => {
-  stopScanner()
+// 清理资源
+onBeforeUnmount(() => {
+  if (html5QrCode && isScanning.value) {
+    html5QrCode.stop().catch(err => console.error('清理扫描器失败:', err))
+  }
 })
 </script>
 
-<style scoped lang="scss">
-.qr-code-scanner {
+<style scoped>
+.qrcode-scanner {
   display: inline-block;
 }
 
 .scanner-container {
   width: 100%;
-  min-height: 300px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
 }
 
-.scanner-tips {
-  text-align: center;
-  margin-top: 10px;
-  color: #606266;
-  
-  p {
-    margin: 0;
-    font-size: 14px;
-  }
+.qr-reader {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.image-upload-container {
-  .upload-demo {
-    margin-bottom: 20px;
-  }
-  
-  .image-preview {
-    margin-top: 20px;
-    text-align: center;
-    
-    img {
-      max-width: 100%;
-      max-height: 300px;
-      border-radius: 4px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-    }
-  }
-}
-
-.scan-result {
-  margin-top: 20px;
+.scan-error {
+  margin-top: 16px;
+  color: #f56c6c;
+  font-size: 14px;
 }
 </style>
