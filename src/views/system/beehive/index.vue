@@ -78,6 +78,9 @@
           v-hasPermi="['system:beehive:export']"
         >导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <qr-code-scanner @submit-data="handleScanSubmit" />
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -142,7 +145,8 @@
 </template>
 
 <script setup name="Beehive">
-import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive } from "@/api/system/beehive"
+import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive, bindBeehiveByQrCode } from "@/api/system/beehive"
+import QrCodeScanner from "@/components/QrCodeScanner/index.vue"
 
 const { proxy } = getCurrentInstance()
 
@@ -302,6 +306,17 @@ function handleExport() {
   proxy.download('system/beehive/export', {
     ...queryParams.value
   }, `beehive_${new Date().getTime()}.xlsx`)
+}
+
+/** 处理二维码扫描提交 */
+function handleScanSubmit(qrCodeData) {
+  // 显示确认对话框，让用户选择操作
+  proxy.$modal.confirm('是否将此二维码绑定到蜂箱？二维码数据: ' + qrCodeData).then(() => {
+    return bindBeehiveByQrCode(qrCodeData)
+  }).then(() => {
+    proxy.$modal.msgSuccess('绑定成功')
+    getList()
+  }).catch(() => {})
 }
 
 getList()

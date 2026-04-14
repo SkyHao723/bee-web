@@ -42,3 +42,12 @@ export function delBeehive(beehiveId) {
     method: 'delete'
   })
 }
+
+// 通过二维码绑定蜂箱
+export function bindBeehiveByQrCode(qrCodeData) {
+  return request({
+    url: '/system/beehive/bind',
+    method: 'post',
+    data: { qrCode: qrCodeData }
+  })
+}
