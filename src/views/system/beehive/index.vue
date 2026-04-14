@@ -146,7 +146,7 @@
 
 <script setup name="Beehive">
 import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive, bindBeehiveByQrCode } from "@/api/system/beehive"
-import QrCodeScanner from "@/components/QrCodeScanner/index.vue"
+import QrCodeScanner from "@/components/QrCodeScanner"
 
 const { proxy } = getCurrentInstance()
 
