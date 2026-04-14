@@ -42,3 +42,21 @@ export function delBeehive(beehiveId) {
     method: 'delete'
   })
 }
+
+// 验证二维码
+export function verifyQrCode(qrCode) {
+  return request({
+    url: '/beehive/beehive/bind',
+    method: 'post',
+    data: { qrCode: qrCode }
+  })
+}
+
+// 激活蜂箱
+export function activateBeehive(data) {
+  return request({
+    url: '/beehive/beehive/activate',
+    method: 'post',
+    data: data
+  })
+}

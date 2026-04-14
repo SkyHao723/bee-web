@@ -68,9 +68,28 @@
     <el-table v-loading="loading" :data="equipmentList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="设备编号" align="center" prop="equipmentId" />
-      <el-table-column label="蜂箱ID" align="center" prop="beehiveId" />
-      <el-table-column label="蜂厂ID" align="center" prop="apiaryId" />
-      <el-table-column label="设备状态" align="center" prop="deviceStatus" />
+      <el-table-column label="蜂箱" align="center" prop="beehiveName">
+        <template #default="scope">
+          {{ scope.row.beehiveName || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="蜂厂" align="center" prop="apiaryName">
+        <template #default="scope">
+          {{ scope.row.apiaryName || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="设备状态" align="center" prop="deviceStatus">
+        <template #default="scope">
+          <el-tag v-if="scope.row.deviceStatus === 0" type="info">未激活</el-tag>
+          <el-tag v-else-if="scope.row.deviceStatus === 1" type="success">已激活</el-tag>
+          <el-tag v-else-if="scope.row.deviceStatus === 2" type="danger">异常</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="二维码" align="center" class-name="small-padding fixed-width">
+        <template #default="scope">
+          <el-button link type="success" icon="Printer" @click="showQrCode(scope.row)" v-hasPermi="['system:equipment:query']">查看</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:equipment:edit']">修改</el-button>
@@ -92,13 +111,8 @@
       <el-form ref="equipmentRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="蜂箱ID" prop="beehiveId">
-              <el-input v-model="form.beehiveId" placeholder="请输入蜂箱ID" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="蜂厂ID" prop="apiaryId">
-              <el-input v-model="form.apiaryId" placeholder="请输入蜂厂ID" />
+            <el-form-item label="设备说明">
+              <el-input placeholder="添加设备自动生成二维码" disabled />
             </el-form-item>
           </el-col>
         </el-row>
@@ -110,16 +124,38 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 二维码查看对话框 -->
+    <el-dialog title="设备二维码" v-model="qrCodeOpen" width="400px" append-to-body>
+      <div style="text-align: center;">
+        <img v-if="qrCodeLoadFail" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=error" style="width: 200px; height: 200px; opacity: 0.5;" />
+        <img v-else :src="currentQrCodeImage" style="width: 200px; height: 200px;" @error="qrCodeLoadFail = true" />
+        <div style="margin-top: 10px;">
+          <p>设备编号: {{ currentEquipment.equipmentId }}</p>
+          <p style="word-break: break-all; font-size: 12px; color: #999;">密文: {{ currentQrCode }}</p>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="copyQrCode">复制密文</el-button>
+          <el-button @click="qrCodeOpen = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="Equipment">
 import { listEquipment, getEquipment, delEquipment, addEquipment, updateEquipment } from "@/api/system/equipment"
+import { listApiary } from "@/api/apiary/apiary"
+import { Html5Qrcode } from "html5-qrcode"
 
 const { proxy } = getCurrentInstance()
 
 const equipmentList = ref([])
+const apiaryOptions = ref([])
 const open = ref(false)
+const qrCodeOpen = ref(false)
 const loading = ref(true)
 const showSearch = ref(true)
 const ids = ref([])
@@ -127,6 +163,10 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref("")
+const currentQrCode = ref("")
+const currentQrCodeImage = ref("")
+const currentEquipment = ref({})
+const qrCodeLoadFail = ref(false)
 
 const data = reactive({
   form: {},
@@ -138,14 +178,8 @@ const data = reactive({
     deviceStatus: null
   },
   rules: {
-    beehiveId: [
-      { required: true, message: "蜂箱ID不能为空", trigger: "blur" }
-    ],
     apiaryId: [
       { required: true, message: "蜂厂ID不能为空", trigger: "blur" }
-    ],
-    deviceStatus: [
-      { required: true, message: "设备状态不能为空", trigger: "change" }
     ]
   }
 })
@@ -174,7 +208,7 @@ function reset() {
     equipmentId: null,
     beehiveId: null,
     apiaryId: null,
-    deviceStatus: null
+    deviceStatus: 0
   }
   proxy.resetForm("equipmentRef")
 }
@@ -201,6 +235,10 @@ function handleSelectionChange(selection) {
 /** 新增按钮操作 */
 function handleAdd() {
   reset()
+  // 加载蜂厂下拉列表
+  listApiary().then(res => {
+    apiaryOptions.value = res.rows
+  })
   open.value = true
   title.value = "添加设备管理"
 }
@@ -211,6 +249,10 @@ function handleUpdate(row) {
   const _equipmentId = row.equipmentId || ids.value
   getEquipment(_equipmentId).then(response => {
     form.value = response.data
+    // 加载蜂厂下拉列表
+    listApiary().then(res => {
+      apiaryOptions.value = res.rows
+    })
     open.value = true
     title.value = "修改设备管理"
   })
@@ -253,6 +295,26 @@ function handleExport() {
   proxy.download('system/equipment/export', {
     ...queryParams.value
   }, `equipment_${new Date().getTime()}.xlsx`)
+}
+
+// 查看二维码
+function showQrCode(row) {
+  currentEquipment.value = row
+  // 密文：设备ID_固定密文
+  const fixedSecret = "BEE_HIVE_SECRET_2026"
+  const dataToHash = row.equipmentId + "_" + fixedSecret
+
+  currentQrCode.value = dataToHash
+  // 使用 goqr.me API 生成二维码
+  currentQrCodeImage.value = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(dataToHash)
+  qrCodeOpen.value = true
+}
+
+// 复制密文
+function copyQrCode() {
+  navigator.clipboard.writeText(currentQrCode.value).then(() => {
+    proxy.$modal.msgSuccess("已复制到剪贴板")
+  })
 }
 
 getList()

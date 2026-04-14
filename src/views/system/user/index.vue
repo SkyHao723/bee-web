@@ -162,6 +162,15 @@
           </el-col>
         </el-row>
         <el-row>
+          <el-col :span="12">
+            <el-form-item label="蜂厂">
+              <el-select v-model="form.apiaryId" placeholder="请选择蜂厂" clearable>
+                <el-option v-for="item in apiaryOptions" :key="item.apiaryId" :label="item.apiaryName" :value="item.apiaryId"></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
           <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
@@ -190,6 +199,7 @@ import TreePanel from "@/components/TreePanel"
 import ExcelImportDialog from "@/components/ExcelImportDialog"
 import UserViewDrawer from "./view"
 import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect } from "@/api/system/user"
+import { listApiary } from "@/api/apiary/apiary"
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -211,6 +221,7 @@ const enabledDeptOptions = ref(undefined)
 const initPassword = ref(undefined)
 const postOptions = ref([])
 const roleOptions = ref([])
+const apiaryOptions = ref([])
 // 列显隐信息
 const columns = ref({
   userId: { label: '用户编号', visible: true },
@@ -396,7 +407,8 @@ function reset() {
     status: "0",
     remark: undefined,
     postIds: [],
-    roleIds: []
+    roleIds: [],
+    apiaryId: undefined
   }
   proxy.resetForm("userRef")
 }
@@ -413,6 +425,10 @@ function handleAdd() {
   getUser().then(response => {
     postOptions.value = response.posts
     roleOptions.value = response.roles
+    // 加载蜂厂列表
+    listApiary().then(res => {
+      apiaryOptions.value = res.rows
+    })
     open.value = true
     title.value = "添加用户"
     form.value.password = initPassword.value
@@ -429,6 +445,10 @@ function handleUpdate(row) {
     roleOptions.value = response.roles
     form.value.postIds = response.postIds
     form.value.roleIds = response.roleIds
+    // 加载蜂厂列表
+    listApiary().then(res => {
+      apiaryOptions.value = res.rows
+    })
     open.value = true
     title.value = "修改用户"
     form.value.password = ""

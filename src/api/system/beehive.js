@@ -51,3 +51,21 @@ export function bindBeehiveByQrCode(qrCodeData) {
     data: { qrCode: qrCodeData }
   })
 }
+
+// 验证二维码（复用bind接口）
+export function verifyQrCode(qrCode) {
+  return request({
+    url: '/system/beehive/bind',
+    method: 'post',
+    data: { qrCode: qrCode }
+  })
+}
+
+// 激活蜂箱
+export function activateBeehive(data) {
+  return request({
+    url: '/system/beehive/activate',
+    method: 'post',
+    data: data
+  })
+}
