@@ -42,15 +42,6 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
-          type="primary"
-          plain
-          icon="Plus"
-          @click="handleAdd"
-          v-hasPermi="['system:beehive:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
           type="success"
           plain
           icon="Edit"
@@ -87,9 +78,19 @@
     <el-table v-loading="loading" :data="beehiveList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="蜂箱ID" align="center" prop="beehiveId" />
-      <el-table-column label="蜂厂ID" align="center" prop="apiaryId" />
+      <el-table-column label="蜂厂" align="center" prop="apiaryName">
+        <template #default="scope">
+          {{ scope.row.apiaryName || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column label="蜂箱名称" align="center" prop="beehiveName" />
-      <el-table-column label="蜂箱状态" align="center" prop="beehiveStatus" />
+      <el-table-column label="蜂箱状态" align="center" prop="beehiveStatus">
+        <template #default="scope">
+          <el-tag v-if="scope.row.beehiveStatus === 0" type="info">未激活</el-tag>
+          <el-tag v-else-if="scope.row.beehiveStatus === 1" type="success">已激活</el-tag>
+          <el-tag v-else-if="scope.row.beehiveStatus === 2" type="danger">异常</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="蜂箱组" align="center" prop="beehiveGroup" />
       <el-table-column label="位置" align="center" prop="location" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
@@ -113,13 +114,15 @@
       <el-form ref="beehiveRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="蜂箱ID" prop="beehiveId">
-              <el-input v-model="form.beehiveId" placeholder="请输入蜂箱ID" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="蜂厂ID" prop="apiaryId">
-              <el-input v-model="form.apiaryId" placeholder="请输入蜂厂ID" />
+            <el-form-item label="蜂厂" prop="apiaryId">
+              <el-select v-model="form.apiaryId" placeholder="请选择蜂厂" clearable>
+                <el-option
+                  v-for="item in apiaryOptions"
+                  :key="item.apiaryId"
+                  :label="item.apiaryName"
+                  :value="item.apiaryId"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -145,12 +148,15 @@
 </template>
 
 <script setup name="Beehive">
-import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive, bindBeehiveByQrCode } from "@/api/system/beehive"
+import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive, bindBeehiveByQrCode, activateBeehive } from "@/api/system/beehive"
+import { listApiary } from "@/api/apiary/apiary"
 import QrCodeScanner from "@/components/QrCodeScanner"
+import { nextTick } from "vue"
 
 const { proxy } = getCurrentInstance()
 
 const beehiveList = ref([])
+const apiaryOptions = ref([])
 const open = ref(false)
 const loading = ref(true)
 const showSearch = ref(true)
@@ -159,6 +165,7 @@ const single = ref(true)
 const multiple = ref(true)
 const total = ref(0)
 const title = ref("")
+const scannedPower = ref("")
 
 const data = reactive({
   form: {},
@@ -173,23 +180,11 @@ const data = reactive({
     location: null
   },
   rules: {
-    beehiveId: [
-      { required: true, message: "蜂箱ID不能为空", trigger: "blur" }
-    ],
-    apiaryId: [
-      { required: true, message: "蜂厂ID不能为空", trigger: "blur" }
-    ],
     beehiveName: [
       { required: true, message: "蜂箱名称不能为空", trigger: "blur" }
     ],
-    beehiveStatus: [
-      { required: true, message: "蜂箱状态不能为空", trigger: "change" }
-    ],
-    beehiveGroup: [
-      { required: true, message: "蜂箱组不能为空", trigger: "blur" }
-    ],
-    location: [
-      { required: true, message: "位置不能为空", trigger: "blur" }
+    apiaryId: [
+      { required: true, message: "请选择蜂厂", trigger: "change" }
     ]
   }
 })
@@ -227,7 +222,8 @@ function reset() {
     beehiveName: null,
     beehiveStatus: null,
     beehiveGroup: null,
-    location: null
+    location: null,
+    power: null
   }
   proxy.resetForm("beehiveRef")
 }
@@ -254,18 +250,26 @@ function handleSelectionChange(selection) {
 /** 新增按钮操作 */
 function handleAdd() {
   reset()
-  open.value = true
-  title.value = "添加蜂箱管理"
+  // 加载蜂厂下拉选项
+  listApiary().then(res => {
+    apiaryOptions.value = res.rows
+    open.value = true
+    title.value = "添加蜂箱管理"
+  })
 }
 
 /** 修改按钮操作 */
 function handleUpdate(row) {
   reset()
   const _beehiveId = row.beehiveId || ids.value
-  getBeehive(_beehiveId).then(response => {
-    form.value = response.data
-    open.value = true
-    title.value = "修改蜂箱管理"
+  // 加载蜂厂下拉选项
+  listApiary().then(res => {
+    apiaryOptions.value = res.rows
+    getBeehive(_beehiveId).then(response => {
+      form.value = response.data
+      open.value = true
+      title.value = "修改蜂箱管理"
+    })
   })
 }
 
@@ -280,11 +284,20 @@ function submitForm() {
           getList()
         })
       } else {
-        addBeehive(form.value).then(() => {
-          proxy.$modal.msgSuccess("新增成功")
-          open.value = false
-          getList()
-        })
+        // 如果有power字段，使用activate接口激活蜂箱
+        if (form.value.power) {
+          activateBeehive(form.value).then(() => {
+            proxy.$modal.msgSuccess("激活成功")
+            open.value = false
+            getList()
+          })
+        } else {
+          addBeehive(form.value).then(() => {
+            proxy.$modal.msgSuccess("新增成功")
+            open.value = false
+            getList()
+          })
+        }
       }
     }
   })
@@ -313,9 +326,26 @@ function handleScanSubmit(qrCodeData) {
   // 显示确认对话框，让用户选择操作
   proxy.$modal.confirm('是否将此二维码绑定到蜂箱？二维码数据: ' + qrCodeData).then(() => {
     return bindBeehiveByQrCode(qrCodeData)
-  }).then(() => {
-    proxy.$modal.msgSuccess('绑定成功')
-    getList()
+  }).then((response) => {
+    // 绑定成功，打开添加弹窗
+    reset()
+    scannedPower.value = qrCodeData
+    form.value.power = qrCodeData
+
+    // 如果返回了设备信息，设置apiaryId
+    if (response && response.data && response.data.apiaryId) {
+      form.value.apiaryId = response.data.apiaryId
+    }
+
+    // 加载蜂厂下拉列表后打开弹窗
+    listApiary().then(res => {
+      apiaryOptions.value = res.rows
+
+      nextTick(() => {
+        open.value = true
+        title.value = "绑定蜂箱"
+      })
+    })
   }).catch(() => {})
 }
 
