@@ -174,7 +174,7 @@
     />
 
     <!-- 添加或修改设备管理对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
+    <el-dialog :title="title" v-model="open" :width="dialogWidth" append-to-body>
       <el-form ref="equipmentRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -193,7 +193,7 @@
     </el-dialog>
 
     <!-- 二维码查看对话框 -->
-    <el-dialog title="设备二维码" v-model="qrCodeOpen" width="400px" append-to-body>
+    <el-dialog title="设备二维码" v-model="qrCodeOpen" :width="qrDialogWidth" append-to-body>
       <div style="text-align: center;">
         <img v-if="qrCodeLoadFail" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=error" style="width: 200px; height: 200px; opacity: 0.5;" />
         <img v-else :src="currentQrCodeImage" style="width: 200px; height: 200px;" @error="qrCodeLoadFail = true" />
@@ -247,6 +247,15 @@ onMounted(() => {
 // 组件卸载时移除监听器
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+})
+
+// 弹窗响应式宽度
+const dialogWidth = computed(() => {
+  return isMobile.value ? '90%' : '500px'
+})
+
+const qrDialogWidth = computed(() => {
+  return isMobile.value ? '90%' : '400px'
 })
 
 const equipmentList = ref([])

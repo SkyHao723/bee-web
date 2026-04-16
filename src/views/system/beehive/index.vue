@@ -170,7 +170,7 @@
     />
 
     <!-- 添加或修改蜂箱管理对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
+    <el-dialog :title="title" v-model="open" :width="dialogWidth" append-to-body>
       <el-form ref="beehiveRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -242,6 +242,11 @@ onMounted(() => {
 // 组件卸载时移除监听器
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+})
+
+// 弹窗响应式宽度
+const dialogWidth = computed(() => {
+  return isMobile.value ? '90%' : '500px'
 })
 
 const beehiveList = ref([])

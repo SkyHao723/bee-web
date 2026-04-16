@@ -1,6 +1,7 @@
 <template>
   <div class="navbar" :class="'nav' + settingsStore.navType">
-    <hamburger id="hamburger-container" :is-active="appStore.sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
+    <!-- 汉堡菜单按钮仅在 PC 端显示 -->
+    <hamburger v-if="device !== 'mobile'" id="hamburger-container" :is-active="appStore.sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
     <breadcrumb v-if="settingsStore.navType == 1" id="breadcrumb-container" class="breadcrumb-container" />
     <top-nav v-if="settingsStore.navType == 2" id="topmenu-container" class="topmenu-container" />
     <template v-if="settingsStore.navType == 3">
@@ -9,7 +10,8 @@
     </template>
 
     <div class="right-menu">
-    <template v-if="device!=='mobile'">
+      <!-- PC端显示的额外功能 -->
+      <template v-if="device!=='mobile'">
         <!-- <search id="header-search" class="right-menu-item" /> -->
 
         <!-- <el-tooltip content="源码地址" effect="dark" placement="bottom">
@@ -29,13 +31,13 @@
         <el-tooltip content="消息通知" effect="dark" placement="bottom">
           <header-notice id="header-notice" class="right-menu-item hover-effect" />
         </el-tooltip>
-
       </template>
 
+      <!-- 用户头像和下拉菜单（PC和移动端都显示） -->
       <el-dropdown @command="handleCommand" class="avatar-container right-menu-item hover-effect" trigger="hover">
         <div class="avatar-wrapper">
           <img :src="userStore.avatar" class="user-avatar" />
-          <span class="user-nickname"> {{ userStore.nickName }} </span>
+          <span class="user-nickname" v-if="device !== 'mobile'">{{ userStore.nickName }}</span>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -269,6 +271,8 @@ async function toggleTheme(event) {
         margin-top: 10px;
         right: 8px;
         position: relative;
+        display: flex;
+        align-items: center;
 
         .user-avatar {
           cursor: pointer;
@@ -292,6 +296,35 @@ async function toggleTheme(event) {
           right: -20px;
           top: 25px;
           font-size: 12px;
+        }
+      }
+    }
+  }
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .navbar {
+    height: 50px;
+    padding: 0 12px;
+    
+    /* 强制隐藏汉堡菜单按钮（双重保险） */
+    .hamburger-container {
+      display: none !important;
+    }
+    
+    .right-menu {
+      .avatar-container {
+        .avatar-wrapper {
+          .user-avatar {
+            width: 32px;
+            height: 32px;
+            margin-right: 0;
+          }
+          
+          .user-nickname {
+            display: none; /* 移动端隐藏昵称 */
+          }
         }
       }
     }

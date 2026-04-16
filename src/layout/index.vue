@@ -16,9 +16,11 @@
 
     <!-- 移动端：只显示主体内容，底部显示 Dock 栏 -->
     <template v-else>
-      <div class="mobile-main-container">
-        <navbar v-if="showMobileNavbar" />
-        <app-main />
+      <div class="mobile-layout-container">
+        <navbar v-if="showMobileNavbar" class="mobile-navbar-fixed" />
+        <div class="mobile-content-scrollable">
+          <app-main />
+        </div>
       </div>
       <bottom-dock />
     </template>
@@ -45,8 +47,8 @@ const fixedHeader = computed(() => settingsStore.fixedHeader)
 
 // 可选：移动端是否显示顶部导航栏
 const showMobileNavbar = computed(() => {
-  // 可根据路由或配置决定是否显示，默认 false 以节省空间
-  return false
+  // 可根据路由或配置决定是否显示，默认 true 以显示顶栏
+  return true
 })
 
 // 动态绑定 class（保留原有样式逻辑）
@@ -111,12 +113,29 @@ function setLayout() {
   padding-bottom: 60px;
 }
 
-// 移动端主容器样式
-.mobile-main-container {
-  height: 100%;
-  padding-bottom: 60px; /* 为底部 Dock 栏留出空间，避免遮挡内容 */
-  overflow-y: auto;
-  box-sizing: border-box;
+// 移动端布局容器 - 使用 Flexbox 布局
+.mobile-layout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+// 移动端固定顶栏
+.mobile-navbar-fixed {
+  flex-shrink: 0; /* 防止被压缩 */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+// 移动端可滚动内容区域
+.mobile-content-scrollable {
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* 只有内容区域可滚动 */
+  overflow-x: hidden;
+  padding-bottom: 60px; /* 为底部 Dock 栏留出空间 */
+  -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
 }
 
 .drawer-bg {

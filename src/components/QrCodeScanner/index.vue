@@ -5,7 +5,7 @@
     <el-dialog
       v-model="dialogVisible"
       title="扫描二维码"
-      width="500px"
+      :width="isMobile ? '90%' : '500px'"
       :close-on-click-modal="false"
       @close="handleClose"
     >
@@ -22,7 +22,7 @@
     <el-dialog
       v-model="resultDialogVisible"
       title="扫描结果"
-      width="400px"
+      :width="isMobile ? '90%' : '400px'"
     >
       <el-descriptions :column="1" border>
         <el-descriptions-item label="二维码数据">{{ scanResult }}</el-descriptions-item>
@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount, onMounted, onUnmounted } from 'vue'
 import { Camera } from '@element-plus/icons-vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { ElMessage } from 'element-plus'
@@ -50,6 +50,35 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['scan-success', 'scan-error'])
+
+// 响应式状态：是否为移动端视图
+const isMobile = ref(false)
+const MOBILE_BREAKPOINT = 768
+
+/**
+ * 检查屏幕宽度，判断是否为移动端
+ */
+function checkMobile() {
+  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
+}
+
+/**
+ * 窗口大小变化处理函数
+ */
+function handleResize() {
+  checkMobile()
+}
+
+// 组件挂载时初始化并监听窗口变化
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const dialogVisible = ref(false)
 const resultDialogVisible = ref(false)
@@ -185,6 +214,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 10px 0;
 }
 
 .qr-reader {
@@ -194,9 +224,23 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .qr-reader {
+    max-width: 100%;
+  }
+  
+  /* 确保扫描框在移动端不会太大 */
+  :deep(.html5-qrcode-element) {
+    max-width: 100% !important;
+  }
+}
+
 .scan-error {
   margin-top: 16px;
   color: #f56c6c;
   font-size: 14px;
+  text-align: center;
+  padding: 0 20px;
 }
 </style>
