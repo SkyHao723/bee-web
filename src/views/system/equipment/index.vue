@@ -65,7 +65,8 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="equipmentList" @selection-change="handleSelectionChange">
+    <!-- PC/平板端：表格视图 -->
+    <el-table v-loading="loading" :data="equipmentList" @selection-change="handleSelectionChange" v-if="!isMobile">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="设备编号" align="center" prop="equipmentId" />
       <el-table-column label="蜂箱" align="center" prop="beehiveName">
@@ -97,6 +98,72 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 移动端：卡片视图 -->
+    <div v-else v-loading="loading" class="card-list-container">
+      <div v-if="equipmentList.length === 0" class="empty-state">
+        <el-empty description="暂无数据" />
+      </div>
+      <div 
+        v-for="item in equipmentList" 
+        :key="item.equipmentId" 
+        class="equipment-card"
+      >
+        <div class="card-header">
+          <span class="card-title">{{ item.equipmentId }}</span>
+          <el-tag 
+            v-if="item.deviceStatus === 0" 
+            type="info" 
+            size="small"
+          >未激活</el-tag>
+          <el-tag 
+            v-else-if="item.deviceStatus === 1" 
+            type="success" 
+            size="small"
+          >已激活</el-tag>
+          <el-tag 
+            v-else-if="item.deviceStatus === 2" 
+            type="danger" 
+            size="small"
+          >异常</el-tag>
+        </div>
+        
+        <div class="card-body">
+          <div class="info-item">
+            <span class="info-label">蜂箱：</span>
+            <span class="info-value">{{ item.beehiveName || '-' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">蜂厂：</span>
+            <span class="info-value">{{ item.apiaryName || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <el-button 
+            type="success" 
+            size="default"
+            icon="Printer" 
+            @click="showQrCode(item)" 
+            v-hasPermi="['system:equipment:query']"
+          >查看</el-button>
+          <el-button 
+            type="primary" 
+            size="default"
+            icon="Edit" 
+            @click="handleUpdate(item)" 
+            v-hasPermi="['system:equipment:edit']"
+          >修改</el-button>
+          <el-button 
+            type="danger" 
+            size="default"
+            icon="Delete" 
+            @click="handleDelete(item)" 
+            v-hasPermi="['system:equipment:remove']"
+          >删除</el-button>
+        </div>
+      </div>
+    </div>
     
     <pagination
       v-show="total>0"
@@ -149,8 +216,38 @@
 import { listEquipment, getEquipment, delEquipment, addEquipment, updateEquipment } from "@/api/system/equipment"
 import { listApiary } from "@/api/apiary/apiary"
 import { Html5Qrcode } from "html5-qrcode"
+import { onMounted, onUnmounted } from "vue"
 
 const { proxy } = getCurrentInstance()
+
+// 响应式状态：是否为移动端视图
+const isMobile = ref(false)
+const MOBILE_BREAKPOINT = 768 // 移动端断点
+
+/**
+ * 检查屏幕宽度，判断是否为移动端
+ */
+function checkMobile() {
+  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
+}
+
+/**
+ * 窗口大小变化处理函数
+ */
+function handleResize() {
+  checkMobile()
+}
+
+// 组件挂载时初始化并监听窗口变化
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const equipmentList = ref([])
 const apiaryOptions = ref([])
@@ -319,3 +416,125 @@ function copyQrCode() {
 
 getList()
 </script>
+
+<style scoped lang="scss">
+/* 移动端卡片列表容器 */
+.card-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+  min-height: 200px;
+}
+
+/* 设备卡片样式 */
+.equipment-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+  transition: all 0.3s ease;
+  
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* 卡片头部 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+/* 卡片内容区域 */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.info-label {
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: var(--el-text-color-primary);
+  flex: 1;
+  word-break: break-all;
+}
+
+/* 卡片底部操作区 */
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  
+  .el-button {
+    min-width: 70px;
+    min-height: 44px; /* 确保触控区域足够大 */
+    font-size: 14px;
+    flex: 1;
+  }
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  padding: 40px 0;
+}
+
+/* 深色模式适配 */
+html.dark {
+  .equipment-card {
+    background: var(--el-bg-color);
+    border-color: var(--el-border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .card-header,
+  .card-footer {
+    border-color: var(--el-border-color);
+  }
+  
+  .info-label {
+    color: var(--el-text-color-secondary);
+  }
+  
+  .info-value {
+    color: var(--el-text-color-primary);
+  }
+}
+</style>

@@ -39,43 +39,36 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="Edit"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['system:beehive:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="Delete"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['system:beehive:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="Download"
-          @click="handleExport"
-          v-hasPermi="['system:beehive:export']"
-        >导出</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <qr-code-scanner @submit-data="handleScanSubmit" />
-      </el-col>
+    <div class="button-group mb8">
+      <el-button
+        type="success"
+        plain
+        icon="Edit"
+        :disabled="single"
+        @click="handleUpdate"
+        v-hasPermi="['system:beehive:edit']"
+      >修改</el-button>
+      <el-button
+        type="danger"
+        plain
+        icon="Delete"
+        :disabled="multiple"
+        @click="handleDelete"
+        v-hasPermi="['system:beehive:remove']"
+      >删除</el-button>
+      <el-button
+        type="warning"
+        plain
+        icon="Download"
+        @click="handleExport"
+        v-hasPermi="['system:beehive:export']"
+      >导出</el-button>
+      <qr-code-scanner @submit-data="handleScanSubmit" />
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
-    </el-row>
+    </div>
 
-    <el-table v-loading="loading" :data="beehiveList" @selection-change="handleSelectionChange">
+    <!-- PC/平板端：表格视图 -->
+    <el-table v-loading="loading" :data="beehiveList" @selection-change="handleSelectionChange" v-if="!isMobile">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="蜂箱ID" align="center" prop="beehiveId" />
       <el-table-column label="蜂厂" align="center" prop="apiaryName">
@@ -100,6 +93,73 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 移动端：卡片视图 -->
+    <div v-else v-loading="loading" class="card-list-container">
+      <div v-if="beehiveList.length === 0" class="empty-state">
+        <el-empty description="暂无数据" />
+      </div>
+      <div 
+        v-for="item in beehiveList" 
+        :key="item.beehiveId" 
+        class="beehive-card"
+      >
+        <div class="card-header">
+          <span class="card-title">{{ item.beehiveName }}</span>
+          <el-tag 
+            v-if="item.beehiveStatus === 0" 
+            type="info" 
+            size="small"
+          >未激活</el-tag>
+          <el-tag 
+            v-else-if="item.beehiveStatus === 1" 
+            type="success" 
+            size="small"
+          >已激活</el-tag>
+          <el-tag 
+            v-else-if="item.beehiveStatus === 2" 
+            type="danger" 
+            size="small"
+          >异常</el-tag>
+        </div>
+        
+        <div class="card-body">
+          <div class="info-item">
+            <span class="info-label">蜂箱ID：</span>
+            <span class="info-value">{{ item.beehiveId }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">蜂厂：</span>
+            <span class="info-value">{{ item.apiaryName || '-' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">蜂箱组：</span>
+            <span class="info-value">{{ item.beehiveGroup || '-' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">位置：</span>
+            <span class="info-value">{{ item.location || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <el-button 
+            type="primary" 
+            size="default"
+            icon="Edit" 
+            @click="handleUpdate(item)" 
+            v-hasPermi="['system:beehive:edit']"
+          >修改</el-button>
+          <el-button 
+            type="danger" 
+            size="default"
+            icon="Delete" 
+            @click="handleDelete(item)" 
+            v-hasPermi="['system:beehive:remove']"
+          >删除</el-button>
+        </div>
+      </div>
+    </div>
     
     <pagination
       v-show="total>0"
@@ -151,9 +211,38 @@
 import { listBeehive, getBeehive, delBeehive, addBeehive, updateBeehive, bindBeehiveByQrCode, activateBeehive } from "@/api/system/beehive"
 import { listApiary } from "@/api/apiary/apiary"
 import QrCodeScanner from "@/components/QrCodeScanner"
-import { nextTick } from "vue"
+import { nextTick, onMounted, onUnmounted } from "vue"
 
 const { proxy } = getCurrentInstance()
+
+// 响应式状态：是否为移动端视图
+const isMobile = ref(false)
+const MOBILE_BREAKPOINT = 768 // 移动端断点
+
+/**
+ * 检查屏幕宽度，判断是否为移动端
+ */
+function checkMobile() {
+  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT
+}
+
+/**
+ * 窗口大小变化处理函数
+ */
+function handleResize() {
+  checkMobile()
+}
+
+// 组件挂载时初始化并监听窗口变化
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 const beehiveList = ref([])
 const apiaryOptions = ref([])
@@ -351,3 +440,130 @@ function handleScanSubmit(qrCodeData) {
 
 getList()
 </script>
+
+<style scoped lang="scss">
+.button-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 移动端卡片列表容器 */
+.card-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+  min-height: 200px;
+}
+
+/* 蜂箱卡片样式 */
+.beehive-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  transition: all 0.3s ease;
+  
+  &:active {
+    transform: scale(0.98);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* 卡片头部 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+/* 卡片内容区域 */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.info-label {
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: var(--el-text-color-primary);
+  flex: 1;
+  word-break: break-all;
+}
+
+/* 卡片底部操作区 */
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  
+  .el-button {
+    min-width: 70px;
+    min-height: 40px;
+    font-size: 13px;
+  }
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  padding: 40px 0;
+}
+
+/* 深色模式适配 */
+html.dark {
+  .beehive-card {
+    background: var(--el-bg-color);
+    border-color: var(--el-border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .card-header,
+  .card-footer {
+    border-color: var(--el-border-color);
+  }
+  
+  .info-label {
+    color: var(--el-text-color-secondary);
+  }
+  
+  .info-value {
+    color: var(--el-text-color-primary);
+  }
+}
+</style>
