@@ -16,17 +16,12 @@
           class="settings-menu-list"
           @select="handleMenuSelect"
         >
-          <el-menu-item index="/user/profile">
-            <svg-icon icon-class="user" class="menu-icon" />
-            <span>个人中心</span>
-          </el-menu-item>
-          
-          <el-menu-item index="/system/equipment">
+          <el-menu-item index="/equipment">
             <svg-icon icon-class="monitor" class="menu-icon" />
             <span>设备管理</span>
           </el-menu-item>
           
-          <el-menu-item index="/beekeeper/beekeeper">
+          <el-menu-item index="/beekeeper">
             <svg-icon icon-class="user" class="menu-icon" />
             <span>蜂农管理</span>
           </el-menu-item>
@@ -52,28 +47,57 @@ const userStore = useUserStore()
 const activeMenu = computed(() => route.path)
 
 const handleMenuSelect = async (key) => {
-  console.log('跳转路径:', key)
+  console.log('=== 开始跳转 ===')
+  console.log('目标路径:', key)
+  console.log('当前用户角色:', userStore.roles)
+  console.log('已注册路由:', router.getRoutes().map(r => r.path))
   
   try {
     // 检查是否已加载路由
     if (userStore.roles.length === 0) {
-      // 未加载用户信息，先加载
+      console.log('用户信息未加载，开始获取...')
       await userStore.getInfo()
+      console.log('用户信息已加载，角色:', userStore.roles)
       await permissionStore.generateRoutes()
+      console.log('动态路由已生成')
     }
     
     // 检查路由是否存在
-    const routeExists = router.getRoutes().some(r => 
+    const allRoutes = router.getRoutes()
+    console.log('所有已注册路由:', allRoutes.map(r => ({ path: r.path, name: r.name })))
+    
+    const routeExists = allRoutes.some(r => 
       r.path === key || 
       (r.children && r.children.some(c => c.path === key))
     )
     
+    console.log('路由是否存在:', routeExists)
+    
     if (routeExists) {
+      console.log('路由存在，准备跳转')
       router.push(key)
     } else {
+      console.warn('路由不存在，尝试重新生成路由...')
       // 路由不存在，重新加载路由
       await permissionStore.generateRoutes()
-      router.push(key)
+      
+      // 再次检查
+      const routeExistsAfterReload = router.getRoutes().some(r => 
+        r.path === key || 
+        (r.children && r.children.some(c => c.path === key))
+      )
+      
+      if (routeExistsAfterReload) {
+        console.log('重新加载后路由存在，准备跳转')
+        router.push(key)
+      } else {
+        console.error('路由仍然不存在，可能是权限问题')
+        console.error('请检查：')
+        console.error('1. 后端是否返回了该菜单的权限')
+        console.error('2. 当前用户角色是否有访问权限')
+        console.error('3. 菜单是否在系统中正确配置')
+        ElMessage.error('您没有访问该页面的权限，请联系管理员分配菜单权限')
+      }
     }
   } catch (error) {
     console.error('跳转失败:', error)

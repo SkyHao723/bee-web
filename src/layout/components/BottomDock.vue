@@ -88,8 +88,13 @@ const menuList = computed(() => {
     })
   }
   
+  // 过滤掉设备管理和蜂农管理（只在 Dock 栏中隐藏）
+  const filteredMenus = menus.filter(item => {
+    return item.path !== '/equipment' && item.path !== '/beekeeper'
+  })
+  
   // 限制最多显示6个菜单项
-  return menus.slice(0, 6)
+  return filteredMenus.slice(0, 6)
 })
 
 // 判断是否激活
@@ -127,7 +132,7 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
   display: flex;
   width: 100%;
   max-width: 550px; // 增加最大宽度以容纳6个按钮
-  height: 56px; // 稍微降低高度以适应更多按钮
+  height: 56px; // 稍稍微降低高度以适应更多按钮
   background: $bg-glass;
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -152,7 +157,7 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
       align-items: center;
       justify-content: center;
       width: 100%;
-      height: 22px; // 稍微降低图标容器高度
+      height: 22px; // 稍稍微降低图标容器高度
       margin-bottom: 2px; // 减少图标与文字间距
       transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
@@ -189,7 +194,7 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
     }
 
     .nav-text {
-      font-size: 9px; // 稍微减小文字大小
+      font-size: 9px; // 稍稍微减小文字大小
       font-weight: 600;
       color: $text-dark;
       line-height: 1;
