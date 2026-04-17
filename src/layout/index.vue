@@ -47,8 +47,7 @@ const fixedHeader = computed(() => settingsStore.fixedHeader)
 
 // 可选：移动端是否显示顶部导航栏
 const showMobileNavbar = computed(() => {
-  // 可根据路由或配置决定是否显示，默认 true 以显示顶栏
-  return true
+  return false
 })
 
 // 动态绑定 class（保留原有样式逻辑）

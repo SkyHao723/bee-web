@@ -1,15 +1,51 @@
 <template>
   <div class="bee-info">
-    <!-- 添加定位提示状态栏，可选 -->
-    <div v-if="locationStatus" class="status-bar">
-      <span>{{ locationStatus }}</span>
-    </div>
-
     <div id="amap-container" class="map-container"></div>
-    
-    <!-- 温湿度统计图 -->
-    <div class="chart-container">
-      <div ref="chartRef" class="chart"></div>
+
+    <div class="stats-container">
+      <div class="stats-row">
+        <div class="stats-card">
+          <div class="stats-icon beehive-icon">
+            <svg viewBox="0 0 1024 1024"><path d="M832 512a32 32 0 1 1 64 0v352a32 32 0 0 1-32 32H160a32 32 0 0 1-32-32V160a32 32 0 0 1 32-32h352a32 32 0 0 1 0 64H192v640h640z"></path></svg>
+          </div>
+          <div class="stats-info">
+            <div class="stats-value">{{ beehiveCount }}</div>
+            <div class="stats-label">蜂箱数量</div>
+          </div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-icon beekeeper-icon">
+            <svg viewBox="0 0 1024 1024"><path d="M786.496 824.96c-75.008-33.92-135.232-97.152-176.768-173.568-31.616 11.904-65.792 18.56-100.736 18.56s-69.12-6.656-100.736-18.56C340.768 727.808 280.512 791.04 205.504 824.96c-13.824 6.272-22.528 20.096-22.528 35.584V928a32 32 0 0 0 32 32h576a32 32 0 0 0 32-32v-67.456c0-15.488-8.704-29.312-22.528-35.584z"></path></svg>
+          </div>
+          <div class="stats-info">
+            <div class="stats-value">{{ beekeeperCount }}</div>
+            <div class="stats-label">蜂农数量</div>
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stats-card">
+          <div class="stats-card-header">
+            <span class="stats-card-title">蜂箱信息</span>
+          </div>
+          <div class="stats-card-content">
+            <div class="info-item"><span class="info-label">在线蜂箱：</span><span class="info-value">{{ onlineBeehiveCount }}</span></div>
+            <div class="info-item"><span class="info-label">离线蜂箱：</span><span class="info-value">{{ offlineBeehiveCount }}</span></div>
+            <div class="info-item"><span class="info-label">异常蜂箱：</span><span class="info-value">{{ errorBeehiveCount }}</span></div>
+          </div>
+        </div>
+        <div class="stats-card">
+          <div class="stats-card-header">
+            <span class="stats-card-title">警报信息</span>
+            <span class="alert-badge" v-if="alertCount > 0">{{ alertCount }}</span>
+          </div>
+          <div class="stats-card-content">
+            <div class="info-item"><span class="info-label">温度警报：</span><span class="info-value">{{ temperatureAlertCount }}</span></div>
+            <div class="info-item"><span class="info-label">湿度警报：</span><span class="info-value">{{ humidityAlertCount }}</span></div>
+            <div class="info-item"><span class="info-label">其他警报：</span><span class="info-value">{{ otherAlertCount }}</span></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -17,8 +53,6 @@
 <script lang="js">
 // @ts-nocheck
 import AMapLoader from '@amap/amap-jsapi-loader'
-import * as echarts from 'echarts'
-import { listTemperature } from '@/api/system/temperature'
 import { listBeehive } from '@/api/system/beehive'
 
 export default {
@@ -34,22 +68,32 @@ export default {
       locationStatus: '正在定位，请稍后...', // 状态提示
       // 蜂场标记点数据（改为空数组，从后端获取）
       markers: [],
-      // ECharts实例
-      chartInstance: null,
       // 查询参数
       queryParams: {
         apiaryId: 1,
         beehiveId: 1,
         pageNum: 1,
         pageSize: 10
-      }
+      },
+      // 统计数据
+      beehiveCount: 0,
+      beekeeperCount: 0,
+      onlineBeehiveCount: 0,
+      offlineBeehiveCount: 0,
+      errorBeehiveCount: 0,
+      alertCount: 0,
+      temperatureAlertCount: 0,
+      humidityAlertCount: 0,
+      otherAlertCount: 0,
+      // 定时刷新
+      refreshTimer: null
     }
   },
   mounted() {
     this.$nextTick(() => {
       this.initMapAndLoadMarkers()
-      this.initChart()
-      this.loadChartData()
+      this.loadStats()
+      this.startRefreshTimer()
     })
     window.addEventListener('resize', this.handleResize)
   },
@@ -58,17 +102,29 @@ export default {
       this.map.destroy()
       this.map = null
     }
-    if (this.chartInstance) {
-      this.chartInstance.dispose()
-      this.chartInstance = null
-    }
     window.removeEventListener('resize', this.handleResize)
+    this.stopRefreshTimer()
   },
   methods: {
-    // 新增：初始化地图并加载蜂箱标记（确保顺序执行）
+    startRefreshTimer() {
+      this.refreshTimer = setInterval(() => {
+        this.loadStats()
+      }, 30000)
+    },
+    stopRefreshTimer() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer)
+        this.refreshTimer = null
+      }
+    },
+    handleResize() {
+      if (this.map) {
+        this.map.resize()
+      }
+    },
     async initMapAndLoadMarkers() {
-      await this.initMap()  // 等待地图初始化完成
-      await this.loadBeehiveMarkers()  // 地图就绪后再加载标记
+      await this.initMap()
+      await this.loadBeehiveMarkers()
     },
     async initMap() {
       try {
@@ -84,7 +140,19 @@ export default {
           center: this.center,
           resizeEnable: true,
           viewMode: '2D',
+          dragEnable: false,
+          zoomEnable: false,
+          touchZoom: false,
+          doubleClickZoom: false,
+          scrollWheel: false,
+          showLabel: false,
+          keyboardEnable: false,
+          animateEnable: false,
+          isHotspot: false
         })
+
+        this.map.getContainer().style.touchAction = 'none'
+        this.map.getContainer().style.overflow = 'hidden'
 
         // 注意：移除这里的 addMarkers 调用，改为在 loadBeehiveMarkers 中调用
         // 使用浏览器原生定位前先弹窗询问用户授权
@@ -222,7 +290,7 @@ export default {
       this.locationStatus = '已拒绝获取位置，显示默认位置'
     }
   }
-},
+    },
     addMarkers(AMap) {
       if (!AMap) {
         console.error('AMap未定义，无法添加标记')
@@ -264,125 +332,26 @@ export default {
         this.map.add(pointMarker)
       })
     },
+    async loadStats() {
+      try {
+        const response = await listBeehive({ pageNum: 1, pageSize: 1000 })
+        const beehiveList = response.rows || []
+        this.beehiveCount = beehiveList.length
+        this.onlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 1).length
+        this.offlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 0).length
+        this.errorBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 2).length
+        this.beekeeperCount = 0
+        this.temperatureAlertCount = 0
+        this.humidityAlertCount = 0
+        this.otherAlertCount = 0
+        this.alertCount = this.temperatureAlertCount + this.humidityAlertCount + this.otherAlertCount
+      } catch (error) {
+        console.error('加载统计数据失败：', error)
+      }
+    },
     handleResize() {
       if (this.map) {
         this.map.resize()
-      }
-      if (this.chartInstance) {
-        this.chartInstance.resize()
-      }
-    },
-    // 初始化ECharts图表
-    initChart() {
-      this.chartInstance = echarts.init(this.$refs.chartRef)
-      const option = {
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'cross',
-            crossStyle: {
-              color: '#999'
-            }
-          }
-        },
-        toolbox: {
-          feature: {
-            dataView: { show: true, readOnly: false },
-            magicType: { show: true, type: ['line', 'bar'] },
-            restore: { show: true },
-            saveAsImage: { show: true }
-          }
-        },
-        legend: {
-          data: ['湿度', '温度']
-        },
-        xAxis: [
-          {
-            type: 'category',
-            data: [],
-            axisPointer: {
-              type: 'shadow'
-            }
-          }
-        ],
-        yAxis: [
-          {
-            type: 'value',
-            name: '湿度',
-            min: 0,
-            max: 100,
-            interval: 20,
-            axisLabel: {
-              formatter: '{value} %'
-            }
-          },
-          {
-            type: 'value',
-            name: '温度',
-            min: 0,
-            max: 50,
-            interval: 10,
-            axisLabel: {
-              formatter: '{value} °C'
-            }
-          }
-        ],
-        series: [
-          {
-            name: '湿度',
-            type: 'line',
-            yAxisIndex: 0,
-            tooltip: {
-              valueFormatter: function (value) {
-                return value + ' %';
-              }
-            },
-            data: []
-          },
-          {
-            name: '温度',
-            type: 'bar',
-            yAxisIndex: 1,
-            tooltip: {
-              valueFormatter: function (value) {
-                return value + ' °C';
-              }
-            },
-            data: []
-          }
-        ]
-      }
-      this.chartInstance.setOption(option)
-    },
-    // 加载图表数据
-    async loadChartData() {
-      try {
-        const response = await listTemperature(this.queryParams)
-        const data = response.rows || []
-        
-        // 提取时间和数据
-        const times = data.map(item => item.createTime || item.time)
-        const humidity = data.map(item => parseFloat(item.humidity) || 0)
-        const temperature = data.map(item => parseFloat(item.temperature) || 0)
-        
-        // 更新图表
-        this.chartInstance.setOption({
-          xAxis: [
-            {
-              data: times
-            }
-          ],
-          series: [
-            {
-              data: humidity
-            },
-            {
-              data: temperature
-            }
-          ]
-        })
-      } catch (error) {
-        console.error('加载图表数据失败：', error)
       }
     }
   }
@@ -395,34 +364,162 @@ export default {
   height: 100vh;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
-.status-bar {
-  flex-shrink: 0;
-  background-color: #f0f9eb;
-  color: #67c23a;
-  padding: 8px 16px;
-  text-align: center;
-  font-size: 14px;
-  border-bottom: 1px solid #e6e6e6;
-  z-index: 1;
-}
 .map-container {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-}
-.chart-container {
-  flex-shrink: 0;
-  height: 400px;
-  padding: 20px;
-  background-color: #fff;
-  border-top: 1px solid #e6e6e6;
-}
-.chart {
   width: 100%;
   height: 100%;
+  touch-action: none;
+  overflow: hidden;
+}
+.map-container :deep(#amap-container) {
+  touch-action: none !important;
+  overflow: hidden !important;
+}
+.stats-container {
+  position: absolute;
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  width: auto;
+}
+.stats-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.stats-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  padding: 12px 20px;
+}
+.stats-row:first-child .stats-card {
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 28px;
+}
+.stats-row:last-child .stats-card {
+  min-width: 240px;
+  padding: 18px 24px;
+}
+.stats-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+.stats-icon svg {
+  width: 30px;
+  height: 30px;
+  fill: #fff;
+}
+.beehive-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.beekeeper-icon {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.stats-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stats-value {
+  font-size: 34px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+}
+.stats-label {
+  font-size: 17px;
+  color: #666;
+  white-space: nowrap;
+}
+.stats-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.stats-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.alert-badge {
+  background: #f56c6c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+.stats-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  gap: 12px;
+}
+.info-label {
+  color: #666;
+}
+.info-value {
+  color: #333;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .stats-container {
+    bottom: 120px;
+    left: 10px;
+    right: 10px;
+    transform: none;
+  }
+  .stats-card {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+  .stats-row:first-child .stats-card {
+    min-width: 170px;
+    padding: 16px 20px;
+  }
+  .stats-row:last-child .stats-card {
+    min-width: 190px;
+  }
+  .stats-value {
+    font-size: 24px;
+  }
+  .stats-label {
+    font-size: 13px;
+  }
+  .stats-card-title {
+    font-size: 14px;
+  }
+  .info-item {
+    font-size: 13px;
+  }
 }
 </style>
