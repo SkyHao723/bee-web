@@ -78,8 +78,18 @@ const menuList = computed(() => {
   
   extractVisibleRoutes(routes)
   
-  // 限制最多显示5个菜单项，避免移动端拥挤
-  return menus.slice(0, 5)
+  // 添加设置按钮
+  const hasSetting = menus.some(item => item.path === '/system/settings/index')
+  if (!hasSetting) {
+    menus.push({
+      path: '/system/settings/index',
+      title: '设置',
+      icon: 'setting'
+    })
+  }
+  
+  // 限制最多显示6个菜单项
+  return menus.slice(0, 6)
 })
 
 // 判断是否激活
@@ -116,12 +126,12 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
 .footer-nav {
   display: flex;
   width: 100%;
-  max-width: 500px; // 限制大屏下的宽度
-  height: 64px;
+  max-width: 550px; // 增加最大宽度以容纳6个按钮
+  height: 56px; // 稍微降低高度以适应更多按钮
   background: $bg-glass;
-  backdrop-filter: blur(20px); // 👈 从 15px 增加到 20px，增强毛玻璃效果以补偿透明度
-  border: 1px solid rgba(255, 255, 255, 0.15); // 👈 从 0.2 改为 0.15，边框也更透明
-  border-radius: 40px; // 圆润的边角
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 40px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 
@@ -142,31 +152,31 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
       align-items: center;
       justify-content: center;
       width: 100%;
-      height: 26px; // 稍微增加高度
-      margin-bottom: 4px; // 👈 从 13px 改为 4px，图标下移，减小与文字间距
+      height: 22px; // 稍微降低图标容器高度
+      margin-bottom: 2px; // 减少图标与文字间距
       transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
       :deep(.svg-icon) {
-        font-size: 22px !important;
-        width: 22px !important;
-        height: 22px !important;
+        font-size: 18px !important;
+        width: 18px !important;
+        height: 18px !important;
         line-height: 1 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        margin-right: 0 !important; // 👈 移除默认右边距
-        margin-left: 5; // 👈 通过调整这个值来移动图标（正数右移，负数左移）
+        margin-right: 0 !important;
+        margin-left: 0;
       }
 
       .nav-icon {
-        color: $text-dark; // 👈 使用深色，确保在透明背景下清晰可见
+        color: $text-dark;
         transition: color 0.3s;
-        filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8)); // 👈 添加白色阴影增强对比
+        filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8));
       }
 
       .active-dot {
         position: absolute;
-        bottom: -3px; // 👈 进一步下移到 -10px，远离文字
+        bottom: -2px;
         left: 50%;
         transform: translateX(-50%) scale(0);
         width: 4px;
@@ -179,25 +189,25 @@ $bg-glass: rgba(255, 255, 255, 0.3); // 👈 从 0.6 改为 0.3，更加透明
     }
 
     .nav-text {
-      font-size: 11px;
-      font-weight: 600; // 👈 从 500 增加到 600，加粗文字
-      color: $text-dark; // 👈 使用深色，确保在透明背景下清晰可见
-      line-height: 1; // 确保文字行高一致，避免垂直偏移
-      text-align: center; // 文字水平居中
-      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9); // 👈 添加白色阴影增强可读性
+      font-size: 9px; // 稍微减小文字大小
+      font-weight: 600;
+      color: $text-dark;
+      line-height: 1;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
       transition: all 0.3s;
     }
 
     // 激活状态样式
     &.active {
       .icon-wrapper {
-        transform: translateY(-2px) scale(1.1); // 激活时轻微上浮放大
+        transform: translateY(-2px) scale(1.1);
         .nav-icon {
           color: $primary-color;
         }
         .active-dot {
           opacity: 1;
-          transform: translateX(-50%) scale(1); // 保持水平居中 + 缩放显示
+          transform: translateX(-50%) scale(1);
         }
       }
       .nav-text {
