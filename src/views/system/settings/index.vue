@@ -22,7 +22,7 @@
           </el-menu-item>
           
           <el-menu-item index="/system/equipment">
-            <svg-icon icon-class="device" class="menu-icon" />
+            <svg-icon icon-class="monitor" class="menu-icon" />
             <span>设备管理</span>
           </el-menu-item>
           
