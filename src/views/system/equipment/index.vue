@@ -199,12 +199,10 @@
         <img v-else :src="currentQrCodeImage" style="width: 200px; height: 200px;" @error="qrCodeLoadFail = true" />
         <div style="margin-top: 10px;">
           <p>设备编号: {{ currentEquipment.equipmentId }}</p>
-          <p style="word-break: break-all; font-size: 12px; color: #999;">密文: {{ currentQrCode }}</p>
         </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="copyQrCode">复制密文</el-button>
           <el-button @click="qrCodeOpen = false">关闭</el-button>
         </div>
       </template>
