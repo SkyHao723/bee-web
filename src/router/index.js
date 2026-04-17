@@ -89,6 +89,19 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/system/settings',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/system/settings/index'),
+        name: 'Settings',
+        meta: { title: '设置', icon: 'setting' }
+      }
+    ]
   }
 ]
 

@@ -1,22 +1,6 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="蜂箱ID" prop="beehiveId">
-        <el-input
-          v-model="queryParams.beehiveId"
-          placeholder="请输入蜂箱ID"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="蜂厂ID" prop="apiaryId">
-        <el-input
-          v-model="queryParams.apiaryId"
-          placeholder="请输入蜂厂ID"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item label="蜂箱名称" prop="beehiveName">
         <el-input
           v-model="queryParams.beehiveName"
@@ -25,47 +9,13 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="蜂箱组" prop="beehiveGroup">
-        <el-input
-          v-model="queryParams.beehiveGroup"
-          placeholder="请输入蜂箱组"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        <span style="width: 8px; display: inline-block;"></span>
+        <qr-code-scanner @submit-data="handleScanSubmit" />
       </el-form-item>
     </el-form>
-
-    <div class="button-group mb8">
-      <el-button
-        type="success"
-        plain
-        icon="Edit"
-        :disabled="single"
-        @click="handleUpdate"
-        v-hasPermi="['system:beehive:edit']"
-      >修改</el-button>
-      <el-button
-        type="danger"
-        plain
-        icon="Delete"
-        :disabled="multiple"
-        @click="handleDelete"
-        v-hasPermi="['system:beehive:remove']"
-      >删除</el-button>
-      <el-button
-        type="warning"
-        plain
-        icon="Download"
-        @click="handleExport"
-        v-hasPermi="['system:beehive:export']"
-      >导出</el-button>
-      <qr-code-scanner @submit-data="handleScanSubmit" />
-      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
-    </div>
 
     <!-- PC/平板端：表格视图 -->
     <el-table v-loading="loading" :data="beehiveList" @selection-change="handleSelectionChange" v-if="!isMobile">

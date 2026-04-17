@@ -33,35 +33,6 @@
           v-hasPermi="['system:equipment:add']"
         >新增</el-button>
       </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="Edit"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['system:equipment:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="Delete"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['system:equipment:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="Download"
-          @click="handleExport"
-          v-hasPermi="['system:equipment:export']"
-        >导出</el-button>
-      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -89,12 +60,6 @@
       <el-table-column label="二维码" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="success" icon="Printer" @click="showQrCode(scope.row)" v-hasPermi="['system:equipment:query']">查看</el-button>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:equipment:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:equipment:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -147,20 +112,6 @@
             @click="showQrCode(item)" 
             v-hasPermi="['system:equipment:query']"
           >查看</el-button>
-          <el-button 
-            type="primary" 
-            size="default"
-            icon="Edit" 
-            @click="handleUpdate(item)" 
-            v-hasPermi="['system:equipment:edit']"
-          >修改</el-button>
-          <el-button 
-            type="danger" 
-            size="default"
-            icon="Delete" 
-            @click="handleDelete(item)" 
-            v-hasPermi="['system:equipment:remove']"
-          >删除</el-button>
         </div>
       </div>
     </div>
@@ -211,7 +162,7 @@
 </template>
 
 <script setup name="Equipment">
-import { listEquipment, getEquipment, delEquipment, addEquipment, updateEquipment } from "@/api/system/equipment"
+import { listEquipment, addEquipment, updateEquipment } from "@/api/system/equipment"
 import { listApiary } from "@/api/apiary/apiary"
 import { Html5Qrcode } from "html5-qrcode"
 import { onMounted, onUnmounted } from "vue"
@@ -347,21 +298,6 @@ function handleAdd() {
   title.value = "添加设备管理"
 }
 
-/** 修改按钮操作 */
-function handleUpdate(row) {
-  reset()
-  const _equipmentId = row.equipmentId || ids.value
-  getEquipment(_equipmentId).then(response => {
-    form.value = response.data
-    // 加载蜂厂下拉列表
-    listApiary().then(res => {
-      apiaryOptions.value = res.rows
-    })
-    open.value = true
-    title.value = "修改设备管理"
-  })
-}
-
 /** 提交按钮 */
 function submitForm() {
   proxy.$refs["equipmentRef"].validate(valid => {
@@ -381,24 +317,6 @@ function submitForm() {
       }
     }
   })
-}
-
-/** 删除按钮操作 */
-function handleDelete(row) {
-  const _equipmentIds = row.equipmentId || ids.value
-  proxy.$modal.confirm('是否确认删除设备管理编号为"' + _equipmentIds + '"的数据项？').then(function() {
-    return delEquipment(_equipmentIds)
-  }).then(() => {
-    getList()
-    proxy.$modal.msgSuccess("删除成功")
-  }).catch(() => {})
-}
-
-/** 导出按钮操作 */
-function handleExport() {
-  proxy.download('system/equipment/export', {
-    ...queryParams.value
-  }, `equipment_${new Date().getTime()}.xlsx`)
 }
 
 // 查看二维码
