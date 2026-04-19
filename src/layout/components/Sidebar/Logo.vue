@@ -15,6 +15,7 @@
 import logo from '@/assets/logo/logo.png'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
+import { useSystemSidebarTheme } from '@/composables/useSystemSidebarTheme'
 
 defineProps({
   collapse: {
@@ -25,9 +26,9 @@ defineProps({
 
 const title = import.meta.env.VITE_APP_TITLE
 const settingsStore = useSettingsStore()
-const sideTheme = computed(() => settingsStore.sideTheme)
+const { sidebarPrefersDark } = useSystemSidebarTheme()
 
-// 获取Logo背景色
+// 获取Logo背景色（与侧栏一致：系统亮/暗 + 整站暗黑）
 const getLogoBackground = computed(() => {
   if (settingsStore.isDark) {
     return 'var(--sidebar-bg)'
@@ -35,7 +36,7 @@ const getLogoBackground = computed(() => {
   if (settingsStore.navType == 3) {
     return variables.menuLightBg
   }
-  return sideTheme.value === 'theme-dark' ? variables.menuBg : variables.menuLightBg
+  return sidebarPrefersDark.value ? variables.menuBg : variables.menuLightBg
 })
 
 // 获取Logo文字颜色
@@ -46,7 +47,7 @@ const getLogoTextColor = computed(() => {
   if (settingsStore.navType == 3) {
     return variables.menuLightText
   }
-  return sideTheme.value === 'theme-dark' ? '#fff' : variables.menuLightText
+  return sidebarPrefersDark.value ? '#fff' : variables.menuLightText
 })
 </script>
 

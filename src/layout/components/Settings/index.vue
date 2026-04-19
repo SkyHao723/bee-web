@@ -46,12 +46,23 @@
         </div>
       </div>
     </div>
+    <p v-if="!settingsStore.isDark" class="setting-sidebar-hint">
+      未开启整站暗黑时，左侧菜单会随系统亮/暗模式自动切换。下面勾选项为「整站暗黑」开启后的侧栏深浅样式（仍会保存到本地）。
+    </p>
     <div class="drawer-item">
       <span>主题颜色</span>
       <span class="comp-style">
         <el-color-picker v-model="theme" :predefine="predefineColors" @change="themeChange"/>
       </span>
     </div>
+    
+    <div class="drawer-item">
+      <span>跟随系统主题</span>
+      <span class="comp-style">
+        <el-switch v-model="settingsStore.followSystemTheme" @change="followSystemThemeChange" class="drawer-switch" />
+      </span>
+    </div>
+    
     <el-divider />
 
     <h3 class="drawer-title">系统布局配置</h3>
@@ -146,6 +157,13 @@ function themeChange(val) {
   handleThemeStyle(val)
 }
 
+function followSystemThemeChange(val) {
+  if (val) {
+    // 开启跟随系统时，同步当前系统主题
+    settingsStore.syncWithSystemTheme()
+  }
+}
+
 function handleTheme(val) {
   settingsStore.sideTheme = val
   sideTheme.value = val
@@ -190,7 +208,8 @@ function saveSetting() {
     "dynamicTitle": storeSettings.value.dynamicTitle,
     "footerVisible": storeSettings.value.footerVisible,
     "sideTheme": storeSettings.value.sideTheme,
-    "theme": storeSettings.value.theme
+    "theme": storeSettings.value.theme,
+    "followSystemTheme": storeSettings.value.followSystemTheme
   }
   localStorage.setItem("layout-setting", JSON.stringify(layoutSetting))
   setTimeout(proxy.$modal.closeLoading(), 1000)
@@ -255,6 +274,14 @@ defineExpose({
       font-size: 14px;
     }
   }
+}
+
+.setting-sidebar-hint {
+  margin: -12px 0 16px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary, rgba(0, 0, 0, 0.45));
 }
 
 .drawer-item {

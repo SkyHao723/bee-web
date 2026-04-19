@@ -57,5 +57,10 @@ export default {
   /**
    * 底部版权文本内容
    */
-  footerContent: 'Copyright © 2026 蜂箱智联. All Rights Reserved.'
+  footerContent: 'Copyright © 2026 蜂箱智联. All Rights Reserved.',
+
+  /**
+   * 是否跟随系统主题（深色/浅色模式）
+   */
+  followSystemTheme: false
 }

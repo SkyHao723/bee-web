@@ -1,9 +1,10 @@
 import defaultSettings from '@/settings'
-import { useDark, useToggle } from '@vueuse/core'
+import { useDark, useToggle, usePreferredDark } from '@vueuse/core'
 import { useDynamicTitle } from '@/utils/dynamicTitle'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+const preferredDark = usePreferredDark()
 
 const { sideTheme, showSettings, navType, tagsView, tagsViewPersist, tagsIcon, fixedHeader, sidebarLogo, dynamicTitle, footerVisible, footerContent } = defaultSettings
 
@@ -26,7 +27,9 @@ const useSettingsStore = defineStore(
       dynamicTitle: storageSetting.dynamicTitle === undefined ? dynamicTitle : storageSetting.dynamicTitle,
       footerVisible: storageSetting.footerVisible === undefined ? footerVisible : storageSetting.footerVisible,
       footerContent: footerContent,
-      isDark: isDark.value
+      isDark: isDark.value,
+      // 是否跟随系统主题
+      followSystemTheme: storageSetting.followSystemTheme !== undefined ? storageSetting.followSystemTheme : false
     }),
     actions: {
       // 修改布局设置
@@ -45,6 +48,21 @@ const useSettingsStore = defineStore(
       toggleTheme() {
         this.isDark = !this.isDark
         toggleDark()
+      },
+      // 切换跟随系统主题
+      toggleFollowSystemTheme() {
+        this.followSystemTheme = !this.followSystemTheme
+        if (this.followSystemTheme) {
+          // 开启跟随系统时，立即同步系统当前状态
+          this.syncWithSystemTheme()
+        }
+      },
+      // 同步系统主题
+      syncWithSystemTheme() {
+        if (preferredDark.value !== this.isDark) {
+          this.isDark = preferredDark.value
+          toggleDark(preferredDark.value)
+        }
       }
     }
   })

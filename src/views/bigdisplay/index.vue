@@ -1,6 +1,6 @@
 <template>
-  <div class="bee-info">
-    <div id="amap-container" class="map-container"></div>
+  <div class="bee-info" @wheel.capture.prevent="onWheelCapture">
+    <div id="amap-container" ref="mapContainer" class="map-container"></div>
 
     <div class="stats-container">
       <div class="stats-row">
@@ -86,11 +86,23 @@ export default {
       humidityAlertCount: 0,
       otherAlertCount: 0,
       // 定时刷新
-      refreshTimer: null
+      refreshTimer: null,
+      /** @type {HTMLElement[]} */
+      scrollLockHosts: []
     }
   },
   mounted() {
+    // 设置body和html的overflow: hidden，禁止页面滚动
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+
     this.$nextTick(() => {
+      this.lockHostScroll()
+      this.syncBeeFarmLayout()
+      this.attachLayoutObserver()
+      if (this.$el && this.$el.closest('.mobile-content-scrollable')) {
+        this.attachVisualViewportListeners()
+      }
       this.initMapAndLoadMarkers()
       this.loadStats()
       this.startRefreshTimer()
@@ -98,12 +110,19 @@ export default {
     window.addEventListener('resize', this.handleResize)
   },
   beforeDestroy() {
+    this.detachVisualViewportListeners()
+    this.detachLayoutObserver()
+    this.clearBeeFarmLayout()
     if (this.map) {
       this.map.destroy()
       this.map = null
     }
     window.removeEventListener('resize', this.handleResize)
     this.stopRefreshTimer()
+    this.unlockHostScroll()
+    // 恢复body和html的overflow
+    document.body.style.overflow = ''
+    document.documentElement.style.overflow = ''
   },
   methods: {
     startRefreshTimer() {
@@ -118,8 +137,139 @@ export default {
       }
     },
     handleResize() {
-      if (this.map) {
-        this.map.resize()
+      this.syncBeeFarmLayout()
+    },
+    /**
+     * 桌面：与 .app-main 可视矩形对齐（侧栏、顶栏）。
+     * 移动：铺满整个可视视口（含 Dock 下方与安全区），避免底部黑条；Dock z-index 更高叠在地图上。
+     */
+    syncBeeFarmLayout() {
+      const el = this.$el
+      if (!el || typeof el.getBoundingClientRect !== 'function') return
+      const round = (n) => Math.max(0, Math.round(n * 100) / 100)
+      const hostMobile = el.closest('.mobile-content-scrollable')
+      const hostAppMain = el.closest('.app-main')
+
+      el.style.position = 'fixed'
+      el.style.right = 'auto'
+      el.style.bottom = 'auto'
+      el.style.zIndex = '8'
+
+      if (hostMobile) {
+        const vv = window.visualViewport
+        if (vv) {
+          el.style.left = `${round(vv.offsetLeft)}px`
+          el.style.top = `${round(vv.offsetTop)}px`
+          el.style.width = `${round(vv.width)}px`
+          el.style.height = `${round(vv.height)}px`
+        } else {
+          el.style.left = '0px'
+          el.style.top = '0px'
+          el.style.width = `${round(window.innerWidth)}px`
+          el.style.height = `${round(window.innerHeight)}px`
+        }
+      } else if (hostAppMain) {
+        const r = hostAppMain.getBoundingClientRect()
+        el.style.left = `${round(r.left)}px`
+        el.style.top = `${round(r.top)}px`
+        el.style.width = `${round(r.width)}px`
+        el.style.height = `${round(r.height)}px`
+      } else {
+        return
+      }
+
+      this.$nextTick(() => {
+        if (this.map) {
+          this.map.resize()
+        }
+      })
+    },
+    clearBeeFarmLayout() {
+      const el = this.$el
+      if (!el) return
+      el.style.position = ''
+      el.style.left = ''
+      el.style.top = ''
+      el.style.width = ''
+      el.style.height = ''
+      el.style.right = ''
+      el.style.bottom = ''
+      el.style.zIndex = ''
+    },
+    attachLayoutObserver() {
+      this.detachLayoutObserver()
+      const el = this.$el
+      if (!el || typeof ResizeObserver === 'undefined') return
+      const hostAppMain = el.closest('.app-main')
+      const hostMobile = el.closest('.mobile-content-scrollable')
+      this._layoutResizeObserver = new ResizeObserver(() => {
+        this.syncBeeFarmLayout()
+      })
+      if (hostAppMain) {
+        this._layoutResizeObserver.observe(hostAppMain)
+      } else if (hostMobile) {
+        this._layoutResizeObserver.observe(document.documentElement)
+      } else {
+        this._layoutResizeObserver.disconnect()
+        this._layoutResizeObserver = null
+      }
+    },
+    detachLayoutObserver() {
+      if (this._layoutResizeObserver) {
+        this._layoutResizeObserver.disconnect()
+        this._layoutResizeObserver = null
+      }
+    },
+    attachVisualViewportListeners() {
+      this.detachVisualViewportListeners()
+      const vv = window.visualViewport
+      if (!vv) return
+      this._onVisualViewport = () => {
+        this.syncBeeFarmLayout()
+      }
+      vv.addEventListener('resize', this._onVisualViewport)
+      vv.addEventListener('scroll', this._onVisualViewport)
+    },
+    detachVisualViewportListeners() {
+      const vv = window.visualViewport
+      if (vv && this._onVisualViewport) {
+        vv.removeEventListener('resize', this._onVisualViewport)
+        vv.removeEventListener('scroll', this._onVisualViewport)
+        this._onVisualViewport = null
+      }
+    },
+    lockHostScroll() {
+      this.unlockHostScroll()
+      let el = this.$el && this.$el.parentElement
+      while (el) {
+        const cls = el.classList
+        if (cls && (cls.contains('app-main') || cls.contains('mobile-content-scrollable'))) {
+          cls.add('bee-farm-scroll-lock')
+          this.scrollLockHosts.push(el)
+        }
+        el = el.parentElement
+      }
+    },
+    unlockHostScroll() {
+      if (this.scrollLockHosts && this.scrollLockHosts.length) {
+        this.scrollLockHosts.forEach((host) => {
+          host.classList.remove('bee-farm-scroll-lock')
+        })
+        this.scrollLockHosts = []
+      }
+    },
+    /** 禁止整页滚动；浮层上滚轮仍用于缩放地图（地图区域由高德自行处理） */
+    onWheelCapture(e) {
+      e.preventDefault()
+      if (!this.map) return
+      const mapEl = this.$refs.mapContainer
+      if (mapEl && mapEl.contains && mapEl.contains(e.target)) {
+        return
+      }
+      if (e.deltaY < 0) {
+        this.map.zoomIn()
+      } else if (e.deltaY > 0) {
+        this.map.zoomOut()
       }
     },
     async initMapAndLoadMarkers() {
@@ -141,10 +291,10 @@ export default {
           resizeEnable: true,
           viewMode: '2D',
           dragEnable: false,
-          zoomEnable: false,
-          touchZoom: false,
+          zoomEnable: true,
+          touchZoom: true,
           doubleClickZoom: false,
-          scrollWheel: false,
+          scrollWheel: true,
           showLabel: false,
           keyboardEnable: false,
           animateEnable: false,
@@ -153,6 +303,8 @@ export default {
 
         this.map.getContainer().style.touchAction = 'none'
         this.map.getContainer().style.overflow = 'hidden'
+
+        this.syncBeeFarmLayout()
 
         // 注意：移除这里的 addMarkers 调用，改为在 loadBeehiveMarkers 中调用
         // 使用浏览器原生定位前先弹窗询问用户授权
@@ -348,11 +500,6 @@ export default {
       } catch (error) {
         console.error('加载统计数据失败：', error)
       }
-    },
-    handleResize() {
-      if (this.map) {
-        this.map.resize()
-      }
     }
   }
 }
@@ -360,18 +507,33 @@ export default {
 
 <style scoped>
 .bee-info {
-  width: 100%;
-  height: 100vh;
+  /* 具体 left/top/width/height 由 syncBeeFarmLayout 按主内容区视口矩形写入，避免与顶栏/页脚/侧栏错位 */
+  position: fixed;
+  z-index: 8;
   margin: 0;
   padding: 0;
-  position: relative;
   overflow: hidden;
+  overscroll-behavior: none;
+  /* 隐藏滚动条 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.bee-info::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 .map-container {
   width: 100%;
   height: 100%;
   touch-action: none;
   overflow: hidden;
+  /* 隐藏滚动条 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.map-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 .map-container :deep(#amap-container) {
   touch-action: none !important;
@@ -521,5 +683,28 @@ export default {
   .info-item {
     font-size: 13px;
   }
+}
+</style>
+
+<style lang="scss">
+/* 由页面 mounted 给 .app-main / .mobile-content-scrollable 打上 bee-farm-scroll-lock，去掉主区域滚动条 */
+.app-main.bee-farm-scroll-lock,
+.mobile-content-scrollable.bee-farm-scroll-lock {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-main.bee-farm-scroll-lock::-webkit-scrollbar,
+.mobile-content-scrollable.bee-farm-scroll-lock::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 页脚占位会让主区域变矮；地图全屏时去掉底部留白（版权条仍为 fixed 叠在地图上） */
+.app-main.bee-farm-scroll-lock:has(.bee-info) {
+  padding-bottom: 0 !important;
 }
 </style>
