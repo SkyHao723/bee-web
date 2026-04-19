@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <div class="header-title">
-            <svg-icon icon-class="setting" class="header-icon" />
+            <svg-icon icon-class="theme" class="header-icon" />
             <span>设置</span>
           </div>
         </div>
@@ -27,6 +27,13 @@
           </el-menu-item>
         </el-menu>
       </div>
+      
+      <div class="logout-section">
+        <el-button type="danger" class="logout-btn" @click="handleLogout">
+          <svg-icon icon-class="exit-fullscreen" class="logout-icon" />
+          <span>退出登录</span>
+        </el-button>
+      </div>
     </el-card>
   </div>
 </template>
@@ -37,7 +44,7 @@ import { useRoute, useRouter } from 'vue-router'
 import SvgIcon from '@/components/SvgIcon'
 import usePermissionStore from '@/store/modules/permission'
 import useUserStore from '@/store/modules/user'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,7 +60,6 @@ const handleMenuSelect = async (key) => {
   console.log('已注册路由:', router.getRoutes().map(r => r.path))
   
   try {
-    // 检查是否已加载路由
     if (userStore.roles.length === 0) {
       console.log('用户信息未加载，开始获取...')
       await userStore.getInfo()
@@ -62,7 +68,6 @@ const handleMenuSelect = async (key) => {
       console.log('动态路由已生成')
     }
     
-    // 检查路由是否存在
     const allRoutes = router.getRoutes()
     console.log('所有已注册路由:', allRoutes.map(r => ({ path: r.path, name: r.name })))
     
@@ -78,10 +83,8 @@ const handleMenuSelect = async (key) => {
       router.push(key)
     } else {
       console.warn('路由不存在，尝试重新生成路由...')
-      // 路由不存在，重新加载路由
       await permissionStore.generateRoutes()
       
-      // 再次检查
       const routeExistsAfterReload = router.getRoutes().some(r => 
         r.path === key || 
         (r.children && r.children.some(c => c.path === key))
@@ -92,10 +95,6 @@ const handleMenuSelect = async (key) => {
         router.push(key)
       } else {
         console.error('路由仍然不存在，可能是权限问题')
-        console.error('请检查：')
-        console.error('1. 后端是否返回了该菜单的权限')
-        console.error('2. 当前用户角色是否有访问权限')
-        console.error('3. 菜单是否在系统中正确配置')
         ElMessage.error('您没有访问该页面的权限，请联系管理员分配菜单权限')
       }
     }
@@ -103,6 +102,23 @@ const handleMenuSelect = async (key) => {
     console.error('跳转失败:', error)
     ElMessage.error('跳转失败，请重试')
   }
+}
+
+const handleLogout = () => {
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    userStore.logOut().then(() => {
+      ElMessage.success('退出登录成功')
+      router.push('/login')
+    }).catch(() => {
+      ElMessage.error('退出登录失败')
+    })
+  }).catch(() => {
+    // 用户取消
+  })
 }
 
 onMounted(() => {
@@ -173,7 +189,29 @@ onMounted(() => {
   fill: currentColor;
 }
 
-/* 响应式设计 */
+.logout-section {
+  margin-top: 30px;
+  padding: 20px 0;
+  border-top: 1px solid #eee;
+}
+
+.logout-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  letter-spacing: 4px;
+}
+
+.logout-icon {
+  width: 18px;
+  height: 18px;
+}
+
 @media (max-width: 768px) {
   .settings-menu-list {
     display: flex;
