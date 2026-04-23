@@ -23,8 +23,8 @@
           </div>
         </div>
       </div>
-      <div class="stats-row">
-        <div class="stats-card">
+      <div class="stats-row-full">
+        <div class="stats-card stats-card-wide">
           <div class="stats-card-header">
             <span class="stats-card-title">蜂箱信息</span>
           </div>
@@ -34,15 +34,17 @@
             <div class="info-item"><span class="info-label">异常蜂箱：</span><span class="info-value">{{ errorBeehiveCount }}</span></div>
           </div>
         </div>
-        <div class="stats-card">
+      </div>
+      <div class="stats-row-full">
+        <div class="stats-card stats-card-wide">
           <div class="stats-card-header">
-            <span class="stats-card-title">警报信息</span>
+            <span class="stats-card-title">预警信息</span>
             <span class="alert-badge" v-if="alertCount > 0">{{ alertCount }}</span>
           </div>
           <div class="stats-card-content">
-            <div class="info-item"><span class="info-label">温度警报：</span><span class="info-value">{{ temperatureAlertCount }}</span></div>
-            <div class="info-item"><span class="info-label">湿度警报：</span><span class="info-value">{{ humidityAlertCount }}</span></div>
-            <div class="info-item"><span class="info-label">其他警报：</span><span class="info-value">{{ otherAlertCount }}</span></div>
+            <div class="info-item"><span class="info-label">温度预警：</span><span class="info-value">{{ temperatureAlertCount }}</span></div>
+            <div class="info-item"><span class="info-label">湿度预警：</span><span class="info-value">{{ humidityAlertCount }}</span></div>
+            <div class="info-item"><span class="info-label">其他预警：</span><span class="info-value">{{ otherAlertCount }}</span></div>
           </div>
         </div>
       </div>
@@ -85,8 +87,6 @@ export default {
       temperatureAlertCount: 0,
       humidityAlertCount: 0,
       otherAlertCount: 0,
-      // 定时刷新
-      refreshTimer: null,
       /** @type {HTMLElement[]} */
       scrollLockHosts: []
     }
@@ -105,7 +105,6 @@ export default {
       }
       this.initMapAndLoadMarkers()
       this.loadStats()
-      this.startRefreshTimer()
     })
     window.addEventListener('resize', this.handleResize)
   },
@@ -118,26 +117,32 @@ export default {
       this.map = null
     }
     window.removeEventListener('resize', this.handleResize)
-    this.stopRefreshTimer()
     this.unlockHostScroll()
     // 恢复body和html的overflow
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
   },
   methods: {
-    startRefreshTimer() {
-      this.refreshTimer = setInterval(() => {
-        this.loadStats()
-      }, 30000)
-    },
-    stopRefreshTimer() {
-      if (this.refreshTimer) {
-        clearInterval(this.refreshTimer)
-        this.refreshTimer = null
-      }
-    },
     handleResize() {
       this.syncBeeFarmLayout()
+    },
+    async loadStats() {
+      try {
+        const beehiveRes = await listBeehive({ pageNum: 1, pageSize: 1000 })
+        const beehiveList = beehiveRes.rows || []
+        this.beehiveCount = beehiveList.length
+        this.onlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 1).length
+        this.offlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 0).length
+        this.errorBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 2).length
+
+        this.beekeeperCount = 0
+        this.temperatureAlertCount = 0
+        this.humidityAlertCount = 0
+        this.otherAlertCount = 0
+        this.alertCount = this.temperatureAlertCount + this.humidityAlertCount + this.otherAlertCount
+      } catch (error) {
+        console.error('加载统计数据失败：', error)
+      }
     },
     /**
      * 桌面：与 .app-main 可视矩形对齐（侧栏、顶栏）。
@@ -483,23 +488,6 @@ export default {
         
         this.map.add(pointMarker)
       })
-    },
-    async loadStats() {
-      try {
-        const response = await listBeehive({ pageNum: 1, pageSize: 1000 })
-        const beehiveList = response.rows || []
-        this.beehiveCount = beehiveList.length
-        this.onlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 1).length
-        this.offlineBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 0).length
-        this.errorBeehiveCount = beehiveList.filter(b => b.beehiveStatus === 2).length
-        this.beekeeperCount = 0
-        this.temperatureAlertCount = 0
-        this.humidityAlertCount = 0
-        this.otherAlertCount = 0
-        this.alertCount = this.temperatureAlertCount + this.humidityAlertCount + this.otherAlertCount
-      } catch (error) {
-        console.error('加载统计数据失败：', error)
-      }
     }
   }
 }
@@ -539,91 +527,113 @@ export default {
   touch-action: none !important;
   overflow: hidden !important;
 }
+
+/* 统计卡片容器 - PC端右侧垂直居中 */
 .stats-container {
   position: absolute;
-  bottom: 140px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   z-index: 100;
-  width: auto;
+  width: 320px;
 }
+
+/* 第一行：两个卡片并排 */
 .stats-row {
   display: flex;
-  gap: 8px;
-  justify-content: center;
+  gap: 12px;
 }
+
+/* 后面两行：通栏卡片 */
+.stats-row-full {
+  width: 100%;
+}
+
+/* 卡片通用样式 */
 .stats-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  padding: 12px 20px;
+  padding: 16px;
 }
-.stats-row:first-child .stats-card {
-  min-width: 220px;
+
+/* 顶部两个卡片样式 - 带图标和数字 */
+.stats-row .stats-card {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 28px;
+  gap: 12px;
 }
-.stats-row:last-child .stats-card {
-  min-width: 240px;
-  padding: 18px 24px;
-}
+
 .stats-icon {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   flex-shrink: 0;
 }
+
 .stats-icon svg {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   fill: #fff;
 }
+
 .beehive-icon {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
+
 .beekeeper-icon {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
+
 .stats-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
 .stats-value {
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 700;
   color: #1a1a1a;
   line-height: 1.2;
 }
+
 .stats-label {
-  font-size: 17px;
+  font-size: 14px;
   color: #666;
   white-space: nowrap;
 }
+
+/* 通栏卡片样式 */
+.stats-card-wide {
+  width: 100%;
+}
+
 .stats-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
+
 .stats-card-title {
   font-size: 16px;
   font-weight: 600;
   color: #333;
 }
+
 .alert-badge {
   background: #f56c6c;
   color: #fff;
@@ -634,54 +644,65 @@ export default {
   min-width: 18px;
   text-align: center;
 }
+
 .stats-card-content {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
 }
+
 .info-item {
   display: flex;
   justify-content: space-between;
-  font-size: 16px;
+  font-size: 14px;
   gap: 12px;
 }
+
 .info-label {
   color: #666;
 }
+
 .info-value {
   color: #333;
   font-weight: 600;
 }
 
+/* 移动端布局 - 底部居中 */
 @media (max-width: 768px) {
   .stats-container {
-    bottom: 120px;
-    left: 10px;
-    right: 10px;
-    transform: none;
+    right: auto;
+    left: 50%;
+    top: auto;
+    bottom: 90px;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 400px;
   }
-  .stats-card {
-    padding: 14px 16px;
-    gap: 10px;
+
+  .stats-row {
+    flex-direction: row;
   }
-  .stats-row:first-child .stats-card {
-    min-width: 170px;
-    padding: 16px 20px;
-  }
-  .stats-row:last-child .stats-card {
-    min-width: 190px;
-  }
+
   .stats-value {
     font-size: 24px;
   }
+
   .stats-label {
-    font-size: 13px;
+    font-size: 12px;
   }
-  .stats-card-title {
-    font-size: 14px;
+
+  .stats-card {
+    padding: 12px;
   }
-  .info-item {
-    font-size: 13px;
+
+  .stats-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .stats-icon svg {
+    width: 24px;
+    height: 24px;
   }
 }
 </style>
